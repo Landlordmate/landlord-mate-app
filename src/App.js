@@ -1,23 +1,1299 @@
-import logo from './logo.svg';
-import './App.css';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabase';
+import logo from './Logo Landlord mate.jpeg';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
+
+const font = "'Nunito', sans-serif";
+const navy = '#0f1e30';
+const navyLight = '#1a2e45';
+const blue = '#2b7cd3';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI';
+
+const LANDLORD_DOC_TYPES = [
+  'Passport',
+  'Driving Licence',
+  'National Insurance Card',
+  'Rent Smart Wales Licence',
+  'Proof of Address',
+  'Tenancy Deposit Scheme Certificate',
+  'Professional Qualification',
+  'Other'
+];
+
+const DOC_TYPES = [
+  'Gas Safety Certificate',
+  'EICR (Electrical Report)',
+  'EPC (Energy Performance)',
+  'HMO Licence',
+  'Tenancy Agreement',
+  'Deposit Certificate',
+  'Rent Smart Wales Licence',
+  'Other'
+];
+
+const COUNTRIES = ['England', 'Wales', 'Scotland', 'Northern Ireland'];
+
+function getExpiryStatus(expiryDate) {
+  if (!expiryDate) return null;
+  const today = new Date();
+  const expiry = new Date(expiryDate);
+  const daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) return { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'Expired', type: 'expired' };
+  if (daysLeft <= 30) return { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: `${daysLeft}d left`, type: 'urgent' };
+  if (daysLeft <= 90) return { color: '#eab308', bg: 'rgba(234,179,8,0.15)', label: `${daysLeft}d left`, type: 'soon' };
+  return { color: '#22c55e', bg: 'rgba(34,197,94,0.15)', label: `${daysLeft}d left`, type: 'good' };
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const COMPLIANCE_WEIGHTS = {
+  'Gas Safety Certificate': 25,
+  'EICR (Electrical Report)': 20,
+  'EPC (Energy Performance)': 15,
+  'HMO Licence': 15,
+  'Smoke & Carbon Monoxide Alarms': 15,
+  'Tenancy Agreement': 10,
+};
+
+function getComplianceScore(docs) {
+  if (!docs || docs.length === 0) return 0;
+  let score = 0;
+  for (const [docType, points] of Object.entries(COMPLIANCE_WEIGHTS)) {
+    const match = docs.find(d => d.document_type === docType);
+    if (match) {
+      const status = getExpiryStatus(match.expiry_date);
+      if (!match.expiry_date || status?.type === 'good') score += points;
+      else if (status?.type === 'soon') score += Math.round(points * 0.7);
+      else if (status?.type === 'urgent') score += Math.round(points * 0.3);
+    }
+  }
+  return Math.min(score, 100);
+}
+
+function getScoreColor(score) {
+  if (score >= 80) return '#22c55e';
+  if (score >= 50) return '#eab308';
+  return '#ef4444';
+}
+
+function getScoreLabel(score) {
+  if (score >= 80) return 'Good';
+  if (score >= 50) return 'Needs attention';
+  return 'At risk';
+}
+
+function getCountryFlag(country) {
+  switch (country) {
+    case 'Wales': return '🏴󠁧󠁢󠁷󠁬󠁳󠁥';
+    case 'Scotland': return '🏴󠁧󠁢󠁳󠁣󠁴󠁿';
+    case 'Northern Ireland': return '🇬🇧';
+    default: return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
+  }
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function isAndroid() {
+  return /android/i.test(navigator.userAgent);
+}
+
+function HomeScreenBanner({ onDismiss }) {
+  const ios = isIOS();
+  const android = isAndroid();
+  if (!ios && !android) return null;
+
+  return (
+    <div style={{ background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      <span style={{ fontSize: '22px', flexShrink: 0 }}>📱</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '13px' }}>Get the full app experience</p>
+        {ios && (
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: '12px', lineHeight: '1.5' }}>
+            Tap the <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Share</strong> button at the bottom of your browser, then tap <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Add to Home Screen</strong>.
+          </p>
+        )}
+        {android && (
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: '12px', lineHeight: '1.5' }}>
+            Tap the <strong style={{ color: 'rgba(255,255,255,0.8)' }}>menu icon</strong> in your browser, then tap <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Add to Home screen</strong>.
+          </p>
+        )}
+      </div>
+      <button onClick={onDismiss} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '18px', cursor: 'pointer', padding: '0', flexShrink: 0, lineHeight: 1 }}>×</button>
+    </div>
+  );
+}
+
+function AgentView({ token }) {
+  const [property, setProperty] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: prop } = await supabase.from('properties').select('*').eq('share_token', token).single();
+      if (prop) {
+        setProperty(prop);
+        const { data: docs } = await supabase.from('documents').select('*').eq('property_id', prop.id);
+        if (docs) setDocuments(docs);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [token]);
+
+  if (loading) return <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}><p style={{ color: 'white' }}>Loading...</p></div>;
+  if (!property) return <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}><p style={{ color: 'white' }}>Invalid or expired link.</p></div>;
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0f1e30', fontFamily: font }}>
+      <div style={{ background: '#1a2e45', padding: '16px 24px', display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(43,124,211,0.2)' }}>
+        <img src={logo} alt="The Landlord Mate" style={{ height: '40px' }} />
+        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginLeft: '16px' }}>Compliance View</span>
+      </div>
+      <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '24px' }}>
+          <p style={{ margin: 0, color: '#7db3e8', fontSize: '14px' }}>📋 Shared compliance summary — read only.</p>
+        </div>
+        <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px' }}>{property.address_line_1}</h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', marginTop: '-8px', textTransform: 'capitalize', fontSize: '13px' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+        {documents.length === 0 && <div style={{ background: 'rgba(255,255,255,0.04)', padding: '32px', borderRadius: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>No documents uploaded yet</div>}
+        {documents.map(doc => {
+          const status = getExpiryStatus(doc.expiry_date);
+          return (
+            <div key={doc.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '16px 20px', borderRadius: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status ? status.color : '#666', flexShrink: 0 }} />
+                <div>
+                  <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
+                  {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                </div>
+              </div>
+              {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+            </div>
+          );
+        })}
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '12px', marginTop: '32px' }}>Powered by The Landlord Mate · thelandlordmate.com</p>
+      </div>
+    </div>
+  );
+}
+
+function BottomNav({ activeScreen, setScreen }) {
+  const items = [
+    { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+    { id: 'properties', icon: '🏠', label: 'Properties' },
+    { id: 'landlordocs', icon: '🪪', label: 'My Docs' },
+    { id: 'wales', icon: '🏴󠁧󠁢󠁷󠁬󠁳󠁥', label: 'Wales' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' },
+  ];
+  return (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d1b2a', borderTop: '1px solid rgba(43,124,211,0.2)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {items.map(item => (
+        <div key={item.id} onClick={() => setScreen(item.id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', cursor: 'pointer', color: activeScreen === item.id ? blue : 'rgba(255,255,255,0.35)', fontSize: '10px', fontWeight: '700', gap: '4px' }}>
+          <span style={{ fontSize: '20px' }}>{item.icon}</span>
+          {item.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, documents }) {
+  const urgentCount = documents.filter(d => {
+    const s = getExpiryStatus(d.expiry_date);
+    return s?.type === 'expired' || s?.type === 'urgent';
+  }).length;
+
+  const navItem = (id, icon, label, badge) => (
+    <div onClick={() => setScreen(id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.45)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
+      <span style={{ fontSize: '16px' }}>{icon}</span>
+      {label}
+      {badge > 0 && <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{badge}</span>}
+    </div>
+  );
+
+  return (
+    <div style={{ width: '220px', minHeight: '100vh', background: '#0d1b2a', borderRight: '1px solid rgba(43,124,211,0.15)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(43,124,211,0.15)', cursor: 'pointer' }} onClick={() => setScreen('dashboard')}>
+        <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
+      </div>
+      <div style={{ padding: '16px 0', flex: 1 }}>
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
+        {navItem('dashboard', '📊', 'Dashboard', urgentCount)}
+        {navItem('properties', '🏠', 'All Properties')}
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
+        {navItem('landlordocs', '🪪', 'My Documents')}
+        {navItem('wales', '🏴󠁧󠁢󠁷󠁬󠁳󠁥', 'Wales Compliance')}
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
+        {navItem('settings', '⚙️', 'Settings')}
+      </div>
+      <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: blue, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>
+            {user?.email?.[0]?.toUpperCase()}
+          </div>
+          <div style={{ overflow: 'hidden' }}>
+            <p style={{ margin: 0, color: 'white', fontSize: '12px', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'}</p>
+          </div>
+        </div>
+        <button onClick={handleSignOut} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>Sign Out</button>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner }) {
+  const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
+  const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
+  const soonDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
+  const goodDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good');
+  const actionNeeded = [...expiredDocs, ...urgentDocs];
+  const isMobile = useIsMobile();
+
+  const statCard = (label, value, color, sub) => (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: isMobile ? '16px' : '20px 24px', flex: 1, minWidth: isMobile ? '140px' : 'auto' }}>
+      <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</p>
+      <p style={{ margin: '0 0 4px', color: color, fontSize: isMobile ? '28px' : '36px', fontWeight: '900', lineHeight: 1 }}>{value}</p>
+      <p style={{ margin: 0, color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>{sub}</p>
+    </div>
+  );
+
+  const docRow = (doc, property) => {
+    const status = getExpiryStatus(doc.expiry_date);
+    return (
+      <div key={doc.id} onClick={() => { setSelectedProperty(property); setScreen('property'); }} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', marginBottom: '8px', cursor: 'pointer' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#666', flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, color: 'white', fontSize: '14px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.document_type}</p>
+          <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property?.address_line_1} · {doc.expiry_date ? `Due ${new Date(doc.expiry_date).toLocaleDateString('en-GB')}` : 'No expiry set'}</p>
+        </div>
+        {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{status.label}</span>}
+      </div>
+    );
+  };
+
+  const getPropertyForDoc = (doc) => properties.find(p => p.id === doc.property_id);
+
+  return (
+    <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1, overflowY: 'auto' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 4px' }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '13px' }}>
+          {actionNeeded.length > 0 ? `${actionNeeded.length} ${actionNeeded.length === 1 ? 'document needs' : 'documents need'} your attention` : 'All your documents are in order ✓'}
+        </p>
+      </div>
+
+      {showHomeBanner && <HomeScreenBanner onDismiss={onDismissBanner} />}
+
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
+        {statCard('Properties', properties.length, blue, 'All properties')}
+        {statCard('Documents', documents.length, '#22c55e', 'Stored safely')}
+        {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days')}
+        {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent')}
+      </div>
+
+      {actionNeeded.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <p style={{ color: '#ef4444', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>⚠ Expired — action needed</p>
+          {actionNeeded.map(doc => docRow(doc, getPropertyForDoc(doc)))}
+        </div>
+      )}
+
+      {soonDocs.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <p style={{ color: '#eab308', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>⏰ Expiring soon</p>
+          {soonDocs.map(doc => docRow(doc, getPropertyForDoc(doc)))}
+        </div>
+      )}
+
+      {goodDocs.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>✓ All good</p>
+          {goodDocs.map(doc => docRow(doc, getPropertyForDoc(doc)))}
+        </div>
+      )}
+
+      {documents.length === 0 && properties.length === 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '40px 24px', textAlign: 'center' }}>
+          <p style={{ fontSize: '40px', margin: '0 0 12px' }}>🏠</p>
+          <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No documents yet</p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 20px' }}>Add a property and upload your compliance certificates</p>
+          <button onClick={() => setScreen('properties')} style={{ background: blue, color: 'white', border: 'none', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: font }}>Add your first property</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocuments, children }) {
+  const isMobile = useIsMobile();
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
+      {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} />}
+      {isMobile && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
+          <img src={logo} alt="The Landlord Mate" style={{ height: '36px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
+          <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+        </div>
+      )}
+      <div style={{ flex: 1, overflowY: 'auto', marginTop: isMobile ? '60px' : 0 }}>
+        {children}
+      </div>
+      {isMobile && <BottomNav activeScreen={screen} setScreen={setScreen} />}
+    </div>
+  );
+}
 
 function App() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
+  const [properties, setProperties] = useState([]);
+  const [allDocuments, setAllDocuments] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newAddress, setNewAddress] = useState('');
+  const [newPostcode, setNewPostcode] = useState('');
+  const [newType, setNewType] = useState('house');
+  const [newCountry, setNewCountry] = useState('Wales');
+  const [addressResults, setAddressResults] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState('');
+  const [screen, setScreen] = useState('login');
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [showUpload, setShowUpload] = useState(false);
+  const [docType, setDocType] = useState(DOC_TYPES[0]);
+  const [customDocType, setCustomDocType] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [noExpiry, setNoExpiry] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [shareCopied, setShareCopied] = useState(false);
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [editExpiry, setEditExpiry] = useState('');
+  const [editDocType, setEditDocType] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [editPropertyAddress, setEditPropertyAddress] = useState('');
+  const [editPropertyType, setEditPropertyType] = useState('house');
+  const [editPropertyCountry, setEditPropertyCountry] = useState('Wales');
+  const [landlordDocs, setLandlordDocs] = useState([]);
+  const [showLandlordUpload, setShowLandlordUpload] = useState(false);
+  const [landlordDocType, setLandlordDocType] = useState(LANDLORD_DOC_TYPES[0]);
+  const [landlordExpiryDate, setLandlordExpiryDate] = useState('');
+  const [landlordUploadFile, setLandlordUploadFile] = useState(null);
+  const [landlordUploading, setLandlordUploading] = useState(false);
+  const [settingsNewEmail, setSettingsNewEmail] = useState('');
+  const [settingsEmailMsg, setSettingsEmailMsg] = useState('');
+  const [settingsEmailError, setSettingsEmailError] = useState('');
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsNameSaved, setSettingsNameSaved] = useState(false);
+  const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
+  const [settingsNewPassword, setSettingsNewPassword] = useState('');
+  const [settingsPasswordMsg, setSettingsPasswordMsg] = useState('');
+  const [settingsPasswordError, setSettingsPasswordError] = useState('');
+  const [isRecovery, setIsRecovery] = useState(false);
+  const [passwordResetDone, setPasswordResetDone] = useState(false);
+  const [showHomeBanner, setShowHomeBanner] = useState(false);
+  const captchaRef = useRef(null);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        loadPropertiesForUser(session.user.id);
+        setScreen('dashboard');
+        if (!localStorage.getItem('tlm_home_banner_dismissed')) {
+          setShowHomeBanner(true);
+        }
+      }
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+        setScreen('reset-password');
+        setLoading(false);
+        return;
+      }
+      if (session?.user && event !== 'PASSWORD_RECOVERY') {
+        setUser(session.user);
+        if (!localStorage.getItem('tlm_home_banner_dismissed')) {
+          setShowHomeBanner(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleDismissBanner = () => {
+    localStorage.setItem('tlm_home_banner_dismissed', 'true');
+    setShowHomeBanner(false);
+  };
+
+  const loadPropertiesForUser = async (userId) => {
+    const { data: props } = await supabase.from('properties').select('*').eq('user_id', userId);
+    if (props) {
+      setProperties(props);
+      await loadAllDocuments(props);
+    }
+    const { data: ldocs } = await supabase.from('documents').select('*').eq('user_id', userId).is('property_id', null);
+    if (ldocs) setLandlordDocs(ldocs);
+  };
+
+  const loadAllDocuments = async (props) => {
+    if (!props || props.length === 0) { setAllDocuments([]); return; }
+    const allDocs = [];
+    for (const p of props) {
+      const { data } = await supabase.from('documents').select('*').eq('property_id', p.id);
+      if (data) allDocs.push(...data);
+    }
+    setAllDocuments(allDocs);
+  };
+
+  const handleFindAddress = async () => {
+    if (!newPostcode) { setAddressError('Please enter a postcode.'); return; }
+    setAddressLoading(true);
+    setAddressError('');
+    setAddressResults([]);
+    try {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/find-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ postcode: newPostcode })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setAddressError('Postcode not found. Please check and try again.'); setAddressLoading(false); return; }
+      setAddressResults(data.addresses);
+    } catch (e) {
+      setAddressError('Could not look up postcode. Please try again.');
+    }
+    setAddressLoading(false);
+  };
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setError(error.message); setLoading(false); return; }
+    if (data.user) {
+      setUser(data.user);
+      await loadPropertiesForUser(data.user.id);
+      setScreen('dashboard');
+      if (!localStorage.getItem('tlm_home_banner_dismissed')) {
+        setShowHomeBanner(true);
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleSignUp = async () => {
+    setLoading(true);
+    setError('');
+    if (!fullName || !email || !password) { setError('Please fill in all fields.'); setLoading(false); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
+    if (!captchaToken) { setError('Please complete the CAPTCHA.'); setLoading(false); return; }
+
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { captchaToken } });
+    if (error) { setError(error.message); captchaRef.current?.resetCaptcha(); setCaptchaToken(''); setLoading(false); return; }
+
+    const authUser = data.session?.user || data.user;
+
+    if (authUser) {
+      const { data: existing } = await supabase.from('users').select('id').eq('id', authUser.id).single();
+      if (!existing) {
+        const { error: insertError } = await supabase.from('users').insert([{ id: authUser.id, email: email, account_type: 'landlord' }]);
+        if (insertError) { setError(insertError.message); setLoading(false); return; }
+      }
+
+      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, full_name: fullName })
+      }).catch(() => {});
+
+      if (data.session?.user) {
+        setUser(data.session.user);
+        setScreen('dashboard');
+        if (!localStorage.getItem('tlm_home_banner_dismissed')) {
+          setShowHomeBanner(true);
+        }
+      } else {
+        setScreen('verify');
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Please enter your email address first.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'https://app.thelandlordmate.com' });
+    if (error) { setError(error.message); } else { setForgotSent(true); }
+    setLoading(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword || newPassword.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    setLoading(true);
+    setError('');
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) { setError(error.message); setLoading(false); return; }
+    setPasswordResetDone(true);
+    setIsRecovery(false);
+    setLoading(false);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login');
+  };
+
+  const handleSaveProperty = async () => {
+    if (!newAddress) { alert('Please select an address.'); return; }
+    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry }]).select();
+    if (error) { alert(error.message); return; }
+    if (data) {
+      const newProps = [...properties, data[0]];
+      setProperties(newProps);
+      await loadAllDocuments(newProps);
+      setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales');
+    }
+  };
+
+  const handleEditProperty = (p, e) => { e.stopPropagation(); setEditingProperty(p); setEditPropertyAddress(p.address_line_1); setEditPropertyType(p.property_type); setEditPropertyCountry(p.country || 'Wales'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
+  const handleSaveEditProperty = async () => {
+    const { error } = await supabase.from('properties').update({ address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry }).eq('id', editingProperty.id);
+    if (error) { alert(error.message); return; }
+    setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry } : p));
+    setEditingProperty(null);
+  };
+
+  const handleDeleteProperty = async (propertyId, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this property and all its documents?')) return;
+    await supabase.from('documents').delete().eq('property_id', propertyId);
+    await supabase.from('properties').delete().eq('id', propertyId);
+    const newProps = properties.filter(p => p.id !== propertyId);
+    setProperties(newProps);
+    await loadAllDocuments(newProps);
+  };
+
+  const handleSelectProperty = async (property) => {
+    setSelectedProperty(property);
+    setShareLink('');
+    const { data } = await supabase.from('documents').select('*').eq('property_id', property.id);
+    if (data) setDocuments(data);
+    setScreen('property');
+  };
+
+  const handleGenerateShareLink = async () => {
+    const token = crypto.randomUUID();
+    const { error } = await supabase.from('properties').update({ share_token: token }).eq('id', selectedProperty.id);
+    if (error) { alert(error.message); return; }
+    const link = `https://app.thelandlordmate.com?share=${token}`;
+    setShareLink(link);
+    navigator.clipboard.writeText(link);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 3000);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) { alert('Please select a file.'); return; }
+    setUploading(true);
+    const fileExt = uploadFile.name.split('.').pop();
+    const filePath = `${user.id}/${selectedProperty.id}/${Date.now()}.${fileExt}`;
+    const { error: storageError } = await supabase.storage.from('documents').upload(filePath, uploadFile);
+    if (storageError) { alert(storageError.message); setUploading(false); return; }
+    const finalDocType = docType === 'Other' && customDocType.trim() ? customDocType.trim() : docType;
+    const { error: dbError } = await supabase.from('documents').insert([{ property_id: selectedProperty.id, user_id: user.id, document_type: finalDocType, file_path: filePath, expiry_date: noExpiry ? null : (expiryDate || null) }]);
+    if (dbError) { alert(dbError.message); setUploading(false); return; }
+    const { data: updatedDocs } = await supabase.from('documents').select('*').eq('property_id', selectedProperty.id);
+    if (updatedDocs) { setDocuments(updatedDocs); await loadAllDocuments(properties); }
+    setShowUpload(false); setUploadFile(null); setExpiryDate(''); setDocType(DOC_TYPES[0]); setCustomDocType(''); setNoExpiry(false); setUploading(false);
+  };
+
+  const handleLandlordUpload = async () => {
+    if (!landlordUploadFile) { alert('Please select a file.'); return; }
+    setLandlordUploading(true);
+    const fileExt = landlordUploadFile.name.split('.').pop();
+    const filePath = `${user.id}/landlord/${Date.now()}.${fileExt}`;
+    const { error: storageError } = await supabase.storage.from('documents').upload(filePath, landlordUploadFile);
+    if (storageError) { alert(storageError.message); setLandlordUploading(false); return; }
+    const { error: dbError } = await supabase.from('documents').insert([{ user_id: user.id, property_id: null, document_type: landlordDocType, file_path: filePath, expiry_date: landlordExpiryDate || null }]);
+    if (dbError) { alert(dbError.message); setLandlordUploading(false); return; }
+    const { data: updated } = await supabase.from('documents').select('*').eq('user_id', user.id).is('property_id', null);
+    if (updated) setLandlordDocs(updated);
+    setShowLandlordUpload(false); setLandlordUploadFile(null); setLandlordExpiryDate(''); setLandlordDocType(LANDLORD_DOC_TYPES[0]); setLandlordUploading(false);
+  };
+
+  const handleDeleteLandlordDoc = async (docId) => {
+    if (!window.confirm('Delete this document?')) return;
+    await supabase.from('documents').delete().eq('id', docId);
+    setLandlordDocs(landlordDocs.filter(d => d.id !== docId));
+  };
+
+  const handleDeleteDoc = async (docId) => {
+    if (!window.confirm('Delete this document?')) return;
+    await supabase.from('documents').delete().eq('id', docId);
+    setDocuments(documents.filter(d => d.id !== docId));
+    await loadAllDocuments(properties);
+  };
+
+  const handleEditDoc = (doc) => { setEditingDoc(doc); setEditExpiry(doc.expiry_date || ''); setEditDocType(doc.document_type); };
+
+  const handleSaveEdit = async () => {
+    const { error } = await supabase.from('documents').update({ expiry_date: editExpiry || null, document_type: editDocType }).eq('id', editingDoc.id);
+    if (error) { alert(error.message); return; }
+    setDocuments(documents.map(d => d.id === editingDoc.id ? { ...d, expiry_date: editExpiry || null, document_type: editDocType } : d));
+    await loadAllDocuments(properties);
+    setEditingDoc(null);
+  };
+
+  const inputStyle = { width: '100%', padding: '12px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '15px', fontFamily: font, boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white' };
+  const lightInputStyle = { width: '100%', padding: '12px', marginBottom: '12px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '16px', fontFamily: font, boxSizing: 'border-box' };
+  const primaryBtn = { width: '100%', padding: '14px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer' };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const shareToken = urlParams.get("share");
+  if (shareToken) return <AgentView token={shareToken} />;
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}>
+        <div style={{ textAlign: 'center' }}>
+          <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '24px' }} />
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'reset-password') {
+    return (
+      <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+          </div>
+          <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Set new password</h1>
+          {passwordResetDone ? (
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: '#2e7d32', background: '#e8f5e9', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>✓ Password updated successfully!</p>
+              <button onClick={() => setScreen('login')} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Sign In</button>
+            </div>
+          ) : (
+            <div>
+              {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
+              <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>Enter your new password below.</p>
+              <input type="password" placeholder="New password (min 8 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={lightInputStyle} />
+              <button onClick={handleResetPassword} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Saving…' : 'Set New Password'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (user && screen === 'property' && selectedProperty) {
+    return (
+      <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
+            <h1 style={{ color: 'white', fontWeight: '800', marginTop: '4px', fontSize: '20px', margin: 0 }}>{selectedProperty.address_line_1}</h1>
+            {(() => { const score = getComplianceScore(documents); const sc = getScoreColor(score); return (
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <p style={{ margin: 0, color: sc, fontWeight: '900', fontSize: '28px', lineHeight: 1 }}>{score}</p>
+                <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.3)', fontSize: '9px', fontWeight: '700', textTransform: 'uppercase' }}>Health Score</p>
+              </div>
+            ); })()}
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.4)', marginTop: '4px', textTransform: 'capitalize', fontSize: '13px' }}>
+            {selectedProperty.property_type}{selectedProperty.country ? ` · ${getCountryFlag(selectedProperty.country)} ${selectedProperty.country}` : ''}
+          </p>
+
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>🔗 Share with your letting agent</p>
+            <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>No login required — they just click the link.</p>
+            {shareLink && <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all' }}>{shareLink}</div>}
+            <button onClick={handleGenerateShareLink} style={{ background: shareCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              {shareCopied ? '✓ Link copied!' : shareLink ? 'Generate new link' : 'Generate share link'}
+            </button>
+          </div>
+
+          <h2 style={{ color: 'white', fontWeight: '700', margin: '0 0 12px', fontSize: '16px' }}>Compliance Documents</h2>
+          <div style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+            <p style={{ margin: 0, fontSize: '12px', color: 'rgba(234,179,8,0.9)' }}>💡 Click <strong>Edit</strong> on any document to update its expiry date.</p>
+          </div>
+
+          {editingDoc && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.4)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Edit Document</h3>
+              <select value={editDocType} onChange={(e) => setEditDocType(e.target.value)} style={inputStyle}>
+                {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date</label>
+              <input type="date" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} style={inputStyle} />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={handleSaveEdit} style={{ ...primaryBtn, flex: 1 }}>Save Changes</button>
+                <button onClick={() => setEditingDoc(null)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {documents.length === 0 && !showUpload && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
+              <p style={{ fontSize: '32px', margin: '0 0 8px' }}>📄</p>
+              <p style={{ color: 'white', fontWeight: '600', margin: '0 0 6px', fontSize: '14px' }}>No documents yet</p>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px', margin: 0 }}>Upload your first compliance document below</p>
+            </div>
+          )}
+
+          {documents.map(doc => {
+            const status = getExpiryStatus(doc.expiry_date);
+            return (
+              <div key={doc.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '16px', borderRadius: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: 0 }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#555', flexShrink: 0, marginTop: '5px' }} />
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
+                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                      {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: '#eab308', fontSize: '12px' }}>⚠ No expiry date set</p>}
+                      {doc.document_type === 'Deposit Certificate' && (
+                        <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <a href="https://www.tenancydepositscheme.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '11px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '3px 8px', borderRadius: '4px', textDecoration: 'none' }}>TDS →</a>
+                          <a href="https://www.depositprotection.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '11px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '3px 8px', borderRadius: '4px', textDecoration: 'none' }}>DPS →</a>
+                          <a href="https://www.mydeposits.co.uk" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '11px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '3px 8px', borderRadius: '4px', textDecoration: 'none' }}>MyDeposits →</a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                    <button onClick={() => handleEditDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => handleDeleteDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {showUpload && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.3)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Upload Document</h3>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Document type</label>
+              <select value={docType} onChange={(e) => { setDocType(e.target.value); setCustomDocType(''); }} style={inputStyle}>
+                {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              {docType === 'Other' && (
+                <input type="text" placeholder="Enter document type…" value={customDocType} onChange={(e) => setCustomDocType(e.target.value)} style={{ ...inputStyle, marginTop: '-4px' }} />
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <input type="checkbox" id="noExpiry" checked={noExpiry} onChange={(e) => { setNoExpiry(e.target.checked); if (e.target.checked) setExpiryDate(''); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="noExpiry" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>No expiry date (e.g. tenancy agreement, deposit cert)</label>
+              </div>
+              {!noExpiry && (
+                <>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(optional but recommended)</span></label>
+                  <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} style={inputStyle} />
+                </>
+              )}
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button onClick={handleUpload} disabled={uploading} style={{ ...primaryBtn, flex: 1, opacity: uploading ? 0.7 : 1 }}>{uploading ? 'Uploading…' : 'Upload Document'}</button>
+                <button onClick={() => setShowUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {!showUpload && <button onClick={() => setShowUpload(true)} style={{ ...primaryBtn, marginTop: '8px' }}>+ Upload Document</button>}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user && screen === 'properties') {
+    return (
+      <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
+          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>All Properties</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Click a property to manage its compliance documents.</p>
+
+          {properties.length === 0 && !showAdd && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
+              <p style={{ fontSize: '40px', margin: '0 0 12px' }}>🏠</p>
+              <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No properties yet</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Add your first rental property to get started</p>
+            </div>
+          )}
+
+          {editingProperty && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.4)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Edit Property</h3>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Address</label>
+              <input type="text" value={editPropertyAddress} onChange={(e) => setEditPropertyAddress(e.target.value)} style={inputStyle} />
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Property type</label>
+              <select value={editPropertyType} onChange={(e) => setEditPropertyType(e.target.value)} style={inputStyle}>
+                <option value="house">House</option>
+                <option value="flat">Flat</option>
+                <option value="hmo">HMO</option>
+              </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
+              <select value={editPropertyCountry} onChange={(e) => setEditPropertyCountry(e.target.value)} style={inputStyle}>
+                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={handleSaveEditProperty} style={{ ...primaryBtn, flex: 1 }}>Save Changes</button>
+                <button onClick={() => setEditingProperty(null)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {properties.map(p => (
+            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '16px 20px', borderRadius: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
+                  <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px', textTransform: 'capitalize' }}>
+                    {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>Manage Documents →</span>
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                <button onClick={(e) => handleEditProperty(p, e)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                <button onClick={(e) => handleDeleteProperty(p.id, e)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+              </div>
+            </div>
+          ))}
+
+          {showAdd && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.3)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Add New Property</h3>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
+              <select value={newCountry} onChange={(e) => setNewCountry(e.target.value)} style={inputStyle}>
+                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Postcode</label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <input type="text" placeholder="e.g. CF641TH" value={newPostcode} onChange={(e) => setNewPostcode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleFindAddress(); }} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+                <button onClick={handleFindAddress} disabled={addressLoading} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', opacity: addressLoading ? 0.7 : 1 }}>
+                  {addressLoading ? '…' : 'Find'}
+                </button>
+              </div>
+              {addressError && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠ {addressError}</p>}
+              {addressResults.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select address</label>
+                  <select onChange={(e) => setNewAddress(e.target.value)} style={inputStyle} defaultValue="">
+                    <option value="" disabled>Choose address…</option>
+                    {addressResults.map((a, i) => <option key={i} value={a}>{a}</option>)}
+                  </select>
+                </div>
+              )}
+              {newAddress && (
+                <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px', fontSize: '13px', color: '#22c55e', fontWeight: '600' }}>
+                  ✓ {newAddress}
+                </div>
+              )}
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Property type</label>
+              <select value={newType} onChange={(e) => setNewType(e.target.value)} style={inputStyle}>
+                <option value="house">House</option>
+                <option value="flat">Flat</option>
+                <option value="hmo">HMO</option>
+              </select>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={handleSaveProperty} style={{ ...primaryBtn, flex: 1 }}>Save Property</button>
+                <button onClick={() => { setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {!showAdd && <button onClick={() => setShowAdd(true)} style={{ ...primaryBtn, marginTop: '8px' }}>+ Add Property</button>}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user && screen === 'landlordocs') {
+    return (
+      <AppShell screen="landlordocs" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
+          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🪪 My Documents</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Your personal landlord documents — stored once, available always.</p>
+
+          {landlordDocs.length === 0 && !showLandlordUpload && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
+              <p style={{ fontSize: '40px', margin: '0 0 12px' }}>🪪</p>
+              <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No documents yet</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Upload your passport, licences and landlord certificates here</p>
+            </div>
+          )}
+
+          {landlordDocs.map(doc => {
+            const status = getExpiryStatus(doc.expiry_date);
+            return (
+              <div key={doc.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '16px', borderRadius: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1, minWidth: 0 }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#2b7cd3', flexShrink: 0, marginTop: '5px' }} />
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
+                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                      {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>No expiry date</p>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                    <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {showLandlordUpload && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.3)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Upload Document</h3>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Document type</label>
+              <select value={landlordDocType} onChange={(e) => setLandlordDocType(e.target.value)} style={inputStyle}>
+                {LANDLORD_DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(optional)</span></label>
+              <input type="date" value={landlordExpiryDate} onChange={(e) => setLandlordExpiryDate(e.target.value)} style={inputStyle} />
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setLandlordUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button onClick={handleLandlordUpload} disabled={landlordUploading} style={{ ...primaryBtn, flex: 1, opacity: landlordUploading ? 0.7 : 1 }}>{landlordUploading ? 'Uploading…' : 'Upload Document'}</button>
+                <button onClick={() => setShowLandlordUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {!showLandlordUpload && <button onClick={() => setShowLandlordUpload(true)} style={{ ...primaryBtn, marginTop: '8px' }}>+ Upload Document</button>}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user && screen === 'wales') {
+    return (
+      <AppShell screen="wales" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
+          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🏴󠁧󠁢󠁷󠁬󠁳󠁥 Wales Compliance Centre</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Everything you need under the Renting Homes (Wales) Act 2016.</p>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>QUICK LINKS</p>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '28px' }}>
+            {[
+              { label: 'Rent Smart Wales', url: 'https://rentsmart.gov.wales' },
+              { label: 'NRLA', url: 'https://www.nrla.org.uk' },
+              { label: 'Welsh Gov Housing', url: 'https://www.gov.wales/renting-homes-landlords' },
+              { label: 'TDS', url: 'https://www.tenancydepositscheme.com' },
+              { label: 'DPS', url: 'https://www.depositprotection.com' },
+              { label: 'MyDeposits', url: 'https://www.mydeposits.co.uk' },
+            ].map((link, i) => (
+              <a key={i} href={link.url} target="_blank" rel="noreferrer" style={{ background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.25)', color: blue, padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', textDecoration: 'none', fontFamily: font }}>
+                {link.label} →
+              </a>
+            ))}
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>NRLA TEMPLATES & RESOURCES</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px', borderRadius: '12px', marginBottom: '28px' }}>
+            <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>Free landlord templates from the NRLA</p>
+            <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.45)', fontSize: '13px', lineHeight: '1.6' }}>Tenancy agreements, notice templates, inventory forms, rent increase notices and more — all free to NRLA members.</p>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <a href="https://www.nrla.org.uk/resources/wales" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '12px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '4px 10px', borderRadius: '4px', textDecoration: 'none' }}>Tenancy Agreements →</a>
+              <a href="https://www.nrla.org.uk/resources/wales" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '12px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '4px 10px', borderRadius: '4px', textDecoration: 'none' }}>Notice Templates →</a>
+              <a href="https://www.nrla.org.uk/resources" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '12px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '4px 10px', borderRadius: '4px', textDecoration: 'none' }}>All Resources →</a>
+            </div>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>COMPLIANCE REQUIREMENTS</p>
+          {[
+            { title: 'Rent Smart Wales Licence', desc: 'All landlords in Wales must be registered and licensed with Rent Smart Wales. Renewals every 5 years.', link: 'https://rentsmart.gov.wales', urgent: true },
+            { title: 'Gas Safety Certificate', desc: 'Annual inspection by a Gas Safe registered engineer. Must be provided to tenants within 28 days.', urgent: false },
+            { title: 'EICR (Electrical Report)', desc: 'Required every 5 years. Must be carried out by a qualified electrician.', urgent: false },
+            { title: 'EPC (Energy Performance Certificate)', desc: 'Required before marketing. Valid for 10 years. Minimum rating of E required.', urgent: false },
+            { title: 'Written Occupation Contract', desc: 'Under the Renting Homes Act, landlords must provide a written occupation contract within 14 days of occupation.', urgent: true },
+            { title: 'Deposit Protection', desc: 'Deposits must be protected in an approved scheme (TDS, DPS or MyDeposits) within 30 days and information provided to the occupant.', urgent: false },
+            { title: 'Smoke & Carbon Monoxide Alarms', desc: 'Working smoke alarms on every floor and CO alarms in rooms with gas appliances.', urgent: false },
+          ].map((item, i) => (
+            <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${item.urgent ? 'rgba(43,124,211,0.3)' : 'rgba(255,255,255,0.07)'}`, padding: '18px 20px', borderRadius: '12px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>{item.title}</p>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.45)', fontSize: '13px', lineHeight: '1.6' }}>{item.desc}</p>
+                  {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '12px', fontWeight: '600', marginTop: '8px', display: 'inline-block' }}>Visit Rent Smart Wales →</a>}
+                </div>
+                {item.urgent && <span style={{ background: 'rgba(43,124,211,0.15)', color: blue, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>Wales</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </AppShell>
+    );
+  }
+
+  const handleChangeEmail = async () => {
+    setSettingsEmailMsg(''); setSettingsEmailError('');
+    if (!settingsNewEmail || !settingsNewEmail.includes('@')) { setSettingsEmailError('Please enter a valid email address.'); return; }
+    const { error } = await supabase.auth.updateUser({ email: settingsNewEmail });
+    if (error) { setSettingsEmailError(error.message); } else { setSettingsEmailMsg('Confirmation email sent to ' + settingsNewEmail + '. Click the link to confirm the change.'); setSettingsNewEmail(''); }
+  };
+
+  const handleSaveDisplayName = async () => {
+    if (!settingsName.trim()) return;
+    const { error } = await supabase.auth.updateUser({ data: { full_name: settingsName.trim() } });
+    if (!error) { setSettingsNameSaved(true); setTimeout(() => setSettingsNameSaved(false), 3000); }
+  };
+
+  const handleChangePassword = async () => {
+    setSettingsPasswordMsg(''); setSettingsPasswordError('');
+    if (!settingsNewPassword || settingsNewPassword.length < 8) { setSettingsPasswordError('New password must be at least 8 characters.'); return; }
+    const { error } = await supabase.auth.updateUser({ password: settingsNewPassword });
+    if (error) { setSettingsPasswordError(error.message); } else { setSettingsPasswordMsg('Password updated successfully!'); setSettingsNewPassword(''); setSettingsCurrentPassword(''); }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Are you sure? This will permanently delete your account and all your data. This cannot be undone.')) return;
+    if (!window.confirm('Last chance — are you absolutely sure you want to delete your account?')) return;
+    await supabase.from('documents').delete().eq('user_id', user.id);
+    for (const p of properties) await supabase.from('documents').delete().eq('property_id', p.id);
+    await supabase.from('properties').delete().eq('user_id', user.id);
+    await supabase.from('users').delete().eq('id', user.id);
+    await supabase.auth.signOut();
+    setUser(null); setProperties([]); setAllDocuments([]); setScreen('login');
+  };
+
+  if (user && screen === 'settings') {
+    return (
+      <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '600px' }}>
+          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>Settings</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Manage your account and preferences.</p>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '10px' }}>ACCOUNT</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Email address</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>{user?.email}</p>
+            {settingsEmailMsg && <p style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>✓ {settingsEmailMsg}</p>}
+            {settingsEmailError && <p style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>⚠ {settingsEmailError}</p>}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input type="email" placeholder="New email address" value={settingsNewEmail} onChange={(e) => setSettingsNewEmail(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <button onClick={handleChangeEmail} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Change</button>
+            </div>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Display name</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input type="text" placeholder={user?.user_metadata?.full_name || 'Your name'} value={settingsName} onChange={(e) => setSettingsName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <button onClick={handleSaveDisplayName} style={{ padding: '12px 16px', background: settingsNameSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {settingsNameSaved ? '✓ Saved' : 'Save'}
+              </button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '6px 0 0' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'} · {allDocuments.length} documents</p>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 12px', fontSize: '14px' }}>Change Password</p>
+            {settingsPasswordMsg && <p style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>✓ {settingsPasswordMsg}</p>}
+            {settingsPasswordError && <p style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>⚠ {settingsPasswordError}</p>}
+            <input type="password" placeholder="New password (min 8 characters)" value={settingsNewPassword} onChange={(e) => setSettingsNewPassword(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+            <button onClick={handleChangePassword} style={{ width: '100%', padding: '12px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Update Password</button>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUBSCRIPTION</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Free Beta</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Full access during beta — paid plans coming soon.</p>
+              </div>
+              <span style={{ background: 'rgba(43,124,211,0.15)', color: blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>Beta</span>
+            </div>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Email Reminders</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Automatic reminders at 90, 60, 30, 14 and 7 days before any document expires.</p>
+            <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>✓ Active</span>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUPPORT</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Need help?</p>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>thelandlordmate@gmail.com</a>
+            <a href="https://thelandlordmate.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate.com →</a>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>DANGER ZONE</p>
+          <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Delete Account</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 14px' }}>Permanently delete your account and all your data. This cannot be undone.</p>
+            <button onClick={handleDeleteAccount} style={{ padding: '10px 20px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Delete My Account</button>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user) {
+    return (
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <Dashboard
+          properties={properties}
+          documents={allDocuments}
+          setScreen={setScreen}
+          userName={user?.user_metadata?.full_name?.split(' ')[0] || ''}
+          showHomeBanner={showHomeBanner}
+          onDismissBanner={handleDismissBanner}
+          setSelectedProperty={(p) => {
+            setSelectedProperty(p);
+            const load = async () => {
+              const { data } = await supabase.from('documents').select('*').eq('property_id', p.id);
+              if (data) setDocuments(data);
+            };
+            load();
+          }}
+        />
+      </AppShell>
+    );
+  }
+
+  if (screen === 'verify') {
+    return (
+      <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+          </div>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📧</div>
+          <h1 style={{ color: '#0f1e30', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Check your email</h1>
+          <p style={{ color: '#666', fontSize: '15px', lineHeight: '1.6', marginBottom: '24px' }}>We've sent an activation link to <strong>{email}</strong>. Click the link to activate your account.</p>
+          <p style={{ color: '#aaa', fontSize: '13px' }}>Already activated? <span onClick={() => setScreen('login')} style={{ color: '#0f1e30', fontWeight: '700', cursor: 'pointer' }}>Sign in</span></p>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'forgot') {
+    return (
+      <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+          </div>
+          <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Reset your password</h1>
+          {forgotSent ? (
+            <div>
+              <p style={{ textAlign: 'center', color: '#2e7d32', background: '#e8f5e9', padding: '16px', borderRadius: '8px' }}>✓ Check your email for a reset link!</p>
+              <button onClick={() => { setScreen('login'); setForgotSent(false); }} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', marginTop: '16px' }}>Back to Sign In</button>
+            </div>
+          ) : (
+            <div>
+              <p style={{ color: '#666', fontSize: '14px', textAlign: 'center', marginBottom: '24px' }}>Enter your email and we'll send you a reset link.</p>
+              {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} style={lightInputStyle} />
+              <button onClick={handleForgotPassword} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Sending…' : 'Send Reset Link'}
+              </button>
+              <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
+                <span onClick={() => { setScreen('login'); setError(''); }} style={{ color: '#0f1e30', fontWeight: '700', cursor: 'pointer' }}>← Back to Sign In</span>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'signup') {
+    return (
+      <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+          </div>
+          <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Create your account</h1>
+          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '24px', marginTop: '-8px' }}>Start managing your properties for free</p>
+          {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
+          <input type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} style={lightInputStyle} />
+          <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} style={lightInputStyle} />
+          <div style={{ position: 'relative', marginBottom: '20px' }}>
+            <input type={showPassword ? 'text' : 'password'} placeholder="Password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...lightInputStyle, marginBottom: 0, paddingRight: '48px' }} />
+            <span onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '18px' }}>{showPassword ? '🙈' : '👁️'}</span>
+          </div>
+          <div style={{ marginBottom: '20px' }}>
+            <HCaptcha sitekey="82d20312-583c-4d42-b1a2-6b52e0c4cbbc" onVerify={(token) => setCaptchaToken(token)} onExpire={() => setCaptchaToken('')} ref={captchaRef} />
+          </div>
+          <button onClick={handleSignUp} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Creating account…' : 'Create Account'}
+          </button>
+          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
+            Already have an account?{' '}
+            <span onClick={() => { setScreen('login'); setError(''); }} style={{ color: '#0f1e30', fontWeight: '700', cursor: 'pointer' }}>Sign in</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
+    <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+          <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+        </div>
+        <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Sign in to your account</h1>
+        {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
+        <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} style={lightInputStyle} />
+        <div style={{ position: 'relative', marginBottom: '8px' }}>
+          <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSignIn(); }} style={{ ...lightInputStyle, marginBottom: 0, paddingRight: '48px' }} />
+          <span onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '18px' }}>{showPassword ? '🙈' : '👁️'}</span>
+        </div>
+        <p style={{ textAlign: 'right', margin: '0 0 16px', fontSize: '14px' }}>
+          <span onClick={() => { setScreen('forgot'); setError(''); }} style={{ color: '#0f1e30', fontWeight: '600', cursor: 'pointer' }}>Forgot password?</span>
         </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+        <button onClick={handleSignIn} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Signing in…' : 'Sign In'}
+        </button>
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
+          Don't have an account?{' '}
+          <span onClick={() => { setScreen('signup'); setError(''); }} style={{ color: '#0f1e30', fontWeight: '700', cursor: 'pointer' }}>Create one free</span>
+        </p>
+      </div>
     </div>
   );
 }
