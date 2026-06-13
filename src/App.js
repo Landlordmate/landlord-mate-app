@@ -9,6 +9,12 @@ const navyLight = '#1a2e45';
 const blue = '#2b7cd3';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI';
 
+const PRICE_IDS = {
+  starter: 'price_1ThpMm6vahEFgcuGjzecKEm3',
+  pro: 'price_1ThpOV6vahEFgcuG2H1Yfl6V',
+  portfolio: 'price_1ThpQD6vahEFgcuGPyhVCk4z',
+};
+
 const LANDLORD_DOC_TYPES = [
   'Passport',
   'Driving Licence',
@@ -42,6 +48,14 @@ function getExpiryStatus(expiryDate) {
   if (daysLeft <= 30) return { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: `${daysLeft}d left`, type: 'urgent' };
   if (daysLeft <= 90) return { color: '#eab308', bg: 'rgba(234,179,8,0.15)', label: `${daysLeft}d left`, type: 'soon' };
   return { color: '#22c55e', bg: 'rgba(34,197,94,0.15)', label: `${daysLeft}d left`, type: 'good' };
+}
+
+function getTrialStatus(trialEndsAt) {
+  if (!trialEndsAt) return { expired: false, daysLeft: 14 };
+  const now = new Date();
+  const end = new Date(trialEndsAt);
+  const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  return { expired: daysLeft <= 0, daysLeft: Math.max(0, daysLeft) };
 }
 
 function getGreeting() {
@@ -79,12 +93,6 @@ function getScoreColor(score) {
   if (score >= 80) return '#22c55e';
   if (score >= 50) return '#eab308';
   return '#ef4444';
-}
-
-function getScoreLabel(score) {
-  if (score >= 80) return 'Good';
-  if (score >= 50) return 'Needs attention';
-  return 'At risk';
 }
 
 function getCountryFlag(country) {
@@ -136,6 +144,63 @@ function HomeScreenBanner({ onDismiss }) {
         )}
       </div>
       <button onClick={onDismiss} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '18px', cursor: 'pointer', padding: '0', flexShrink: 0, lineHeight: 1 }}>×</button>
+    </div>
+  );
+}
+
+function PaywallScreen({ user, onSubscribe, subscribing }) {
+  const isMobile = useIsMobile();
+  const plans = [
+    { key: 'starter', name: 'Starter', price: '£149', period: '/year', properties: '1-3 properties', desc: 'Perfect for small landlords', color: blue },
+    { key: 'pro', name: 'Pro', price: '£299', period: '/year', properties: '4-10 properties', desc: 'Most popular', color: '#7c3aed', highlight: true },
+    { key: 'portfolio', name: 'Portfolio', price: '£499', period: '/year', properties: 'Unlimited properties', desc: 'Serious portfolio landlords', color: '#059669' },
+  ];
+
+  return (
+    <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '680px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
+          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: 0 }}>Choose a plan to keep managing your compliance documents</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
+          {plans.map(plan => (
+            <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
+              {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
+              <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{plan.price}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{plan.period}</span></p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
+              <button
+                onClick={() => onSubscribe(PRICE_IDS[plan.key])}
+                disabled={subscribing}
+                style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}
+              >
+                {subscribing ? 'Loading…' : `Choose ${plan.name}`}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
+          Secure payment via Stripe · Cancel anytime · Questions? <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue }}>thelandlordmate@gmail.com</a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TrialNudgeBanner({ daysLeft, onSubscribe }) {
+  return (
+    <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '20px' }}>⏰</span>
+      <p style={{ margin: 0, color: '#eab308', fontWeight: '700', fontSize: '13px', flex: 1 }}>
+        Your free trial ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'} — choose a plan to keep access
+      </p>
+      <button onClick={onSubscribe} style={{ background: '#eab308', color: '#0f1e30', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontFamily: font, fontWeight: '800', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        Choose a plan
+      </button>
     </div>
   );
 }
@@ -260,7 +325,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
   );
 }
 
-function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner }) {
+function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe }) {
   const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
   const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
   const soonDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
@@ -302,6 +367,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
       </div>
 
       {showHomeBanner && <HomeScreenBanner onDismiss={onDismissBanner} />}
+      {showTrialNudge && <TrialNudgeBanner daysLeft={trialDaysLeft} onSubscribe={onSubscribe} />}
 
       <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
         {statCard('Properties', properties.length, blue, 'All properties')}
@@ -370,6 +436,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [user, setUser] = useState(null);
+  const [userRecord, setUserRecord] = useState(null);
   const [properties, setProperties] = useState([]);
   const [allDocuments, setAllDocuments] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -420,14 +487,21 @@ function App() {
   const [isRecovery, setIsRecovery] = useState(false);
   const [passwordResetDone, setPasswordResetDone] = useState(false);
   const [showHomeBanner, setShowHomeBanner] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
+
+  const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 14 };
+  const isSubscribed = userRecord?.subscription_status === 'active';
+  const trialExpired = trialStatus.expired && !isSubscribed;
+  const showTrialNudge = !trialStatus.expired && trialStatus.daysLeft <= 4 && !isSubscribed;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
         loadPropertiesForUser(session.user.id);
+        loadUserRecord(session.user.id);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -445,14 +519,47 @@ function App() {
       }
       if (session?.user && event !== 'PASSWORD_RECOVERY') {
         setUser(session.user);
+        loadUserRecord(session.user.id);
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
       }
     });
 
+    // Check for successful payment return
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadUserRecord = async (userId) => {
+    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+    if (data) setUserRecord(data);
+  };
+
+  const handleSubscribe = async (priceId) => {
+    setSubscribing(true);
+    try {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ priceId, userId: user.id, email: user.email })
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Something went wrong. Please try again.');
+        setSubscribing(false);
+      }
+    } catch (e) {
+      alert('Something went wrong. Please try again.');
+      setSubscribing(false);
+    }
+  };
 
   const handleDismissBanner = () => {
     localStorage.setItem('tlm_home_banner_dismissed', 'true');
@@ -507,6 +614,7 @@ function App() {
     if (data.user) {
       setUser(data.user);
       await loadPropertiesForUser(data.user.id);
+      await loadUserRecord(data.user.id);
       setScreen('dashboard');
       if (!localStorage.getItem('tlm_home_banner_dismissed')) {
         setShowHomeBanner(true);
@@ -542,6 +650,7 @@ function App() {
 
       if (data.session?.user) {
         setUser(data.session.user);
+        await loadUserRecord(data.session.user.id);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -574,7 +683,7 @@ function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    setUser(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login');
+    setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login');
   };
 
   const handleSaveProperty = async () => {
@@ -724,6 +833,11 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // Hard paywall — trial expired and not subscribed
+  if (user && trialExpired) {
+    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
   }
 
   if (user && screen === 'property' && selectedProperty) {
@@ -1137,11 +1251,16 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Free Beta</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Full access during beta — paid plans coming soon.</p>
+                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>{isSubscribed ? 'Active Subscription' : `Free Trial — ${trialStatus.daysLeft} days left`}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>{isSubscribed ? 'Your subscription is active.' : 'Upgrade to keep access after your trial ends.'}</p>
               </div>
-              <span style={{ background: 'rgba(43,124,211,0.15)', color: blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>Beta</span>
+              <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{isSubscribed ? '✓ Active' : 'Trial'}</span>
             </div>
+            {!isSubscribed && (
+              <button onClick={() => handleSubscribe(PRICE_IDS.starter)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
+                {subscribing ? 'Loading…' : 'Choose a plan'}
+              </button>
+            )}
           </div>
 
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
@@ -1179,6 +1298,9 @@ function App() {
           userName={user?.user_metadata?.full_name?.split(' ')[0] || ''}
           showHomeBanner={showHomeBanner}
           onDismissBanner={handleDismissBanner}
+          trialDaysLeft={trialStatus.daysLeft}
+          showTrialNudge={showTrialNudge}
+          onSubscribe={() => handleSubscribe(PRICE_IDS.starter)}
           setSelectedProperty={(p) => {
             setSelectedProperty(p);
             const load = async () => {
