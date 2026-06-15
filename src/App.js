@@ -13,6 +13,9 @@ const PRICE_IDS = {
   starter: 'price_1ThpMm6vahEFgcuGjzecKEm3',
   pro: 'price_1ThpOV6vahEFgcuG2H1Yfl6V',
   portfolio: 'price_1ThpQD6vahEFgcuGPyhVCk4z',
+  agent_starter: 'price_1TifdQ6vahEFgcuG85QGlksp',
+  agent_pro: 'price_1TifmS6vahEFgcuGR4ctmnZ0',
+  agent_portfolio: 'price_1Tifnq6vahEFgcuGppTEia34',
 };
 
 const LANDLORD_DOC_TYPES = [
@@ -971,16 +974,31 @@ function App() {
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
 
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, full_name: fullName })
-      }).catch(() => {});
+      if (accountType === 'agent') {
+        const agentCode = new URLSearchParams(window.location.search).get('agent') || authUser.id.split('-')[0];
+        const inviteLink = `https://app.thelandlordmate.com?agent=${agentCode}`;
+        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            full_name: agencyName || fullName,
+            subject: `Welcome to The Landlord Mate Agent Portal`,
+            message: `Your agent dashboard is ready at app.thelandlordmate.com\n\nHere's how to get started:\n\n1. Share your landlord invitation link with your clients:\n${inviteLink}\n\n2. When they sign up via your link they automatically appear in your portfolio\n\n3. View their compliance status, send messages and download reports from your dashboard\n\nIf you have any questions just reply to this email.\n\nThe Landlord Mate Team`
+          })
+        }).catch(() => {});
+      } else {
+        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, full_name: fullName })
+        }).catch(() => {});
+      }
 
       if (data.session?.user) {
         setUser(data.session.user);
         await loadUserRecord(data.session.user.id);
-        setShowOnboarding(true);
+        if (accountType !== 'agent') setShowOnboarding(true);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -1256,6 +1274,83 @@ function App() {
   // AGENT DASHBOARD
   if (user && userRecord?.account_type === 'agent') {
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
+    const agentTrialStatus = getTrialStatus(userRecord?.trial_ends_at);
+    const agentIsSubscribed = userRecord?.subscription_status === 'active';
+    const agentTrialExpired = agentTrialStatus.expired && !agentIsSubscribed;
+
+    // Agent paywall
+    if (agentTrialExpired) {
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '720px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
+              <h1 style={{ color: 'white', fontWeight: '900', fontSize: '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 8px' }}>Choose an agent plan to keep managing your portfolio</p>
+              <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', display: 'inline-block' }}>
+                <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>🔒 Your portfolio data is safe — subscribe any time to keep access.</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
+              {[
+                { key: 'agent_starter', name: 'Agent Starter', price: '£999', properties: 'Up to 50 properties', color: blue },
+                { key: 'agent_pro', name: 'Agent Pro', price: '£1,999', properties: 'Up to 200 properties', color: '#7c3aed', highlight: true },
+                { key: 'agent_portfolio', name: 'Agent Portfolio', price: '£3,499', properties: 'Unlimited properties', color: '#059669' },
+              ].map(plan => (
+                <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
+                  {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
+                  <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{plan.price}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>/year</span></p>
+                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
+                  <button onClick={() => handleSubscribe(PRICE_IDS[plan.key])} disabled={subscribing} style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}>
+                    {subscribing ? 'Loading…' : `Choose ${plan.name}`}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
+              Secure payment via Stripe · Questions? <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue }}>thelandlordmate@gmail.com</a>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // Agent onboarding — show for new agents with no properties
+    if (agentProperties.length === 0 && !localStorage.getItem(`tlm_agent_onboarding_${user.id}`)) {
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '560px', textAlign: 'center' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '24px' }} />
+            <h1 style={{ color: 'white', fontWeight: '900', fontSize: '26px', margin: '0 0 12px' }}>Welcome to your Agent Portal! 🏢</h1>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 32px' }}>You're all set up. Here's how to get your landlords linked in 3 easy steps.</p>
+            {[
+              { step: '1', icon: '🔗', title: 'Share your invitation link', desc: 'Send this link to your landlords. When they sign up via your link they automatically appear in your portfolio.' },
+              { step: '2', icon: '🏠', title: 'Landlords add their properties', desc: 'They upload their compliance certificates and enter your email on each property.' },
+              { step: '3', icon: '📊', title: 'You get full visibility', desc: 'See every property, every certificate, every expiry date across your entire portfolio in one place.' },
+            ].map(item => (
+              <div key={item.step} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px 24px', marginBottom: '12px', textAlign: 'left', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: blue, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '900', fontSize: '14px', flexShrink: 0 }}>{item.step}</div>
+                <div>
+                  <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '15px' }}>{item.icon} {item.title}</p>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: '1.6' }}>{item.desc}</p>
+                </div>
+              </div>
+            ))}
+            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '12px', padding: '16px 20px', margin: '24px 0', textAlign: 'left' }}>
+              <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>Your invitation link</p>
+              <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', wordBreak: 'break-all' }}>{inviteLink}</p>
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 20px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                {inviteCopied ? '✓ Copied!' : 'Copy Link'}
+              </button>
+            </div>
+            <button onClick={() => { localStorage.setItem(`tlm_agent_onboarding_${user.id}`, 'done'); window.location.reload(); }} style={{ width: '100%', padding: '14px', background: blue, color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              Go to my dashboard →
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     const getHealthScore = (propertyId) => {
       const docs = agentDocuments.filter(d => d.property_id === propertyId);
