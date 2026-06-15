@@ -122,6 +122,108 @@ function isAndroid() {
   return /android/i.test(navigator.userAgent);
 }
 
+function CompliancePieChart({ documents }) {
+  const expired = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
+  const urgent = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
+  const soon = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').length;
+  const good = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good').length;
+  const noExpiry = documents.filter(d => !d.expiry_date).length;
+  const total = documents.length;
+  if (total === 0) return null;
+  const size = 120, cx = 60, cy = 60, r = 44, innerR = 26;
+  const segments = [
+    { count: good, color: '#22c55e', label: 'Compliant' },
+    { count: soon, color: '#eab308', label: 'Expiring Soon' },
+    { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
+    { count: noExpiry, color: '#4a9eff', label: 'No Expiry' },
+  ].filter(s => s.count > 0);
+  let startAngle = -Math.PI / 2;
+  const paths = segments.map(seg => {
+    const angle = (seg.count / total) * 2 * Math.PI;
+    const endAngle = startAngle + angle;
+    const x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle), y2 = cy + r * Math.sin(endAngle);
+    const ix1 = cx + innerR * Math.cos(endAngle), iy1 = cy + innerR * Math.sin(endAngle);
+    const ix2 = cx + innerR * Math.cos(startAngle), iy2 = cy + innerR * Math.sin(startAngle);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const d = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`;
+    startAngle = endAngle;
+    return { ...seg, d };
+  });
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
+      <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', margin: '0 0 16px' }}>Compliance Overview</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+          {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} opacity="0.9" />)}
+          <circle cx={cx} cy={cy} r={innerR - 2} fill="#0f1e30" />
+          <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="14" fontWeight="900" fontFamily="Nunito, sans-serif">{total}</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="8" fontFamily="Nunito, sans-serif">DOCS</text>
+        </svg>
+        <div style={{ flex: 1, minWidth: '140px' }}>
+          {[
+            { count: good, color: '#22c55e', label: 'Compliant' },
+            { count: soon, color: '#eab308', label: 'Expiring Soon' },
+            { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
+            { count: noExpiry, color: '#4a9eff', label: 'No Expiry Set' },
+          ].map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+              <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', flex: 1 }}>{item.label}</span>
+              <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>{item.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingWizard({ onComplete, onAddProperty }) {
+  const [step, setStep] = useState(1);
+  const isMobile = useIsMobile();
+  const steps = [
+    { icon: '🏠', title: 'Add your first property', desc: "Start by adding a rental property. We'll look up the address from your postcode.", action: 'Add Property →', isAdd: true, hint: null },
+    { icon: '📄', title: 'Upload a compliance document', desc: "Upload your Gas Safety Certificate, EICR, EPC or any other certificate. Set the expiry date and we'll remind you automatically.", hint: 'We send reminders at 90, 60, 30, 14 and 7 days before expiry.', action: 'Got it →', isAdd: false },
+    { icon: '🔗', title: 'Share with your agent', desc: 'Generate a secure link to share your compliance documents with your letting agent instantly — no login required for them.', action: "Let's go! →", isAdd: false, hint: null },
+  ];
+  const current = steps[step - 1];
+  return (
+    <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1 }}>
+      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 8px' }}>Welcome! Let's get you set up 👋</h1>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>3 quick steps and you're protected</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
+          {[1, 2, 3].map(s => (
+            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: s < step ? '#22c55e' : s === step ? '#2b7cd3' : 'rgba(255,255,255,0.1)', border: `2px solid ${s < step ? '#22c55e' : s === step ? '#2b7cd3' : 'rgba(255,255,255,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: '800' }}>
+                {s < step ? '✓' : s}
+              </div>
+              {s < 3 && <div style={{ width: '40px', height: '2px', background: s < step ? '#22c55e' : 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />}
+            </div>
+          ))}
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', textAlign: 'center', marginBottom: '16px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>{current.icon}</div>
+          <h2 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 12px' }}>Step {step}: {current.title}</h2>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', lineHeight: '1.7', margin: '0 0 24px' }}>{current.desc}</p>
+          {current.hint && (
+            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '10px 16px', marginBottom: '24px' }}>
+              <p style={{ color: '#7db3e8', fontSize: '13px', margin: 0 }}>💡 {current.hint}</p>
+            </div>
+          )}
+          <button onClick={() => { if (current.isAdd) { onAddProperty(); } else if (step < 3) { setStep(step + 1); } else { onComplete(); } }} style={{ width: '100%', padding: '14px', background: '#2b7cd3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+            {current.action}
+          </button>
+        </div>
+        {step < 3 && <p onClick={() => step < 3 ? setStep(step + 1) : onComplete()} style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', margin: 0 }}>Skip for now</p>}
+      </div>
+    </div>
+  );
+}
+
 function HomeScreenBanner({ onDismiss }) {
   const ios = isIOS();
   const android = isAndroid();
@@ -379,6 +481,8 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
         {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent')}
       </div>
 
+      {documents.length > 0 && <CompliancePieChart documents={documents} />}
+
       {actionNeeded.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <p style={{ color: '#ef4444', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>⚠ Expired — action needed</p>
@@ -490,6 +594,7 @@ function App() {
   const [isRecovery, setIsRecovery] = useState(false);
   const [passwordResetDone, setPasswordResetDone] = useState(false);
   const [showHomeBanner, setShowHomeBanner] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
@@ -574,6 +679,9 @@ function App() {
     if (props) {
       setProperties(props);
       await loadAllDocuments(props);
+      if (props.length === 0 && !localStorage.getItem('tlm_onboarding_done')) {
+        setShowOnboarding(true);
+      }
     }
     const { data: ldocs } = await supabase.from('documents').select('*').eq('user_id', userId).is('property_id', null);
     if (ldocs) setLandlordDocs(ldocs);
@@ -654,6 +762,7 @@ function App() {
       if (data.session?.user) {
         setUser(data.session.user);
         await loadUserRecord(data.session.user.id);
+        setShowOnboarding(true);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -686,7 +795,7 @@ function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login');
+    setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login'); setShowOnboarding(false);
   };
 
   const handleSaveProperty = async () => {
@@ -841,6 +950,17 @@ function App() {
   // Hard paywall — trial expired and not subscribed
   if (user && trialExpired) {
     return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
+  }
+
+  if (user && showOnboarding) {
+    return (
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+        <OnboardingWizard
+          onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
+          onAddProperty={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
+        />
+      </AppShell>
+    );
   }
 
   if (user && screen === 'property' && selectedProperty) {
