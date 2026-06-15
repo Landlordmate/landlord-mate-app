@@ -714,15 +714,12 @@ function App() {
   const loadAgentData = async (agentRecord) => {
     setAgentData(agentRecord);
     if (agentRecord.logo_url) setAgencyLogoUrl(agentRecord.logo_url);
-    // Load all landlords linked to this agent
-    const { data: landlords } = await supabase.from('users').select('*').eq('account_type', 'landlord');
-    if (!landlords) return;
-    
+
     // Load all properties with this agent's email
     const { data: props } = await supabase.from('properties').select('*').eq('agent_email', agentRecord.email);
     if (!props) return;
     setAgentProperties(props);
-    
+
     // Load all documents for these properties
     if (props.length > 0) {
       const allDocs = [];
@@ -732,11 +729,30 @@ function App() {
       }
       setAgentDocuments(allDocs);
     }
-    
+
     // Match landlords to properties
-    const landlordIds = [...new Set(props.map(p => p.user_id))];
-    const linkedLandlords = landlords.filter(l => landlordIds.includes(l.id));
-    setAgentLandlords(linkedLandlords);
+    const { data: landlords } = await supabase.from('users').select('*').eq('account_type', 'landlord');
+    if (landlords) {
+      const landlordIds = [...new Set(props.map(p => p.user_id))];
+      setAgentLandlords(landlords.filter(l => landlordIds.includes(l.id)));
+    }
+
+    // Load templates — seed defaults if none exist
+    const { data: existingTemplates } = await supabase.from('templates').select('*').eq('agent_id', agentRecord.id);
+    if (existingTemplates && existingTemplates.length === 0) {
+      const defaults = [
+        { agent_id: agentRecord.id, title: 'Gas Safety Due', body: 'Dear Landlord,\n\nYour Gas Safety Certificate at [property_address] is due for renewal on [expiry_date].\n\nPlease arrange an inspection with a Gas Safe registered engineer and upload the new certificate within 7 days.\n\nKind regards,\n[agency_name]' },
+        { agent_id: agentRecord.id, title: 'EICR Due', body: 'Dear Landlord,\n\nYour Electrical Inspection Report (EICR) at [property_address] expires on [expiry_date].\n\nPlease arrange a new EICR with a qualified electrician and upload the certificate.\n\nKind regards,\n[agency_name]' },
+        { agent_id: agentRecord.id, title: 'Missing Documents', body: 'Dear Landlord,\n\nWe are missing compliance documents for [property_address].\n\nPlease log in to your Landlord Mate account and upload your Gas Safety Certificate, EICR, and EPC as soon as possible.\n\nKind regards,\n[agency_name]' },
+        { agent_id: agentRecord.id, title: 'General Compliance Chase', body: 'Dear Landlord,\n\nPlease update your compliance documents for [property_address] at your earliest convenience.\n\nLog in to your Landlord Mate account to view what needs attention.\n\nKind regards,\n[agency_name]' },
+        { agent_id: agentRecord.id, title: 'HMO Licence Due', body: 'Dear Landlord,\n\nYour HMO Licence for [property_address] expires on [expiry_date].\n\nPlease renew your licence with your local authority and upload the new certificate.\n\nKind regards,\n[agency_name]' },
+        { agent_id: agentRecord.id, title: 'Rent Smart Wales Due', body: 'Dear Landlord,\n\nYour Rent Smart Wales licence expires on [expiry_date].\n\nPlease renew at rentsmart.gov.wales and upload your new certificate.\n\nKind regards,\n[agency_name]' },
+      ];
+      const { data: seeded } = await supabase.from('templates').insert(defaults).select();
+      if (seeded) setAgentTemplates(seeded);
+    } else if (existingTemplates) {
+      setAgentTemplates(existingTemplates);
+    }
   };
 
   const handleSelectAgentProperty = async (property) => {
@@ -939,13 +955,19 @@ function App() {
     if (authUser) {
       const { data: existing } = await supabase.from('users').select('id').eq('id', authUser.id).single();
       if (!existing) {
+        const agentCode = new URLSearchParams(window.location.search).get('agent');
         const { error: insertError } = await supabase.from('users').insert([{ 
           id: authUser.id, 
           email: email, 
           account_type: accountType,
           agency_name: accountType === 'agent' ? agencyName : null,
-          agent_code: accountType === 'agent' ? authUser.id.split('-')[0] : null
+          agent_code: accountType === 'agent' ? authUser.id.split('-')[0] : null,
+          referred_by_agent: agentCode || null
         }]);
+        // If landlord signed up via agent invite link, link their properties to agent
+        if (agentCode && accountType === 'landlord') {
+          await supabase.from('users').update({ referred_by_agent: agentCode }).eq('id', authUser.id);
+        }
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
 
@@ -1320,6 +1342,7 @@ function App() {
                 { id: 'landlord', label: '👤 Landlord' },
                 { id: 'notes', label: `📝 Notes ${agentNotes.length > 0 ? `(${agentNotes.length})` : ''}` },
                 { id: 'templates', label: '✉️ Message' },
+                { id: 'audit', label: '🕐 Audit Log' },
               ].map(tab => (
                 <button key={tab.id} onClick={() => setAgentPropertyTab(tab.id)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', borderBottom: `2px solid ${agentPropertyTab === tab.id ? blue : 'transparent'}`, color: agentPropertyTab === tab.id ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', marginBottom: '-1px' }}>
                   {tab.label}
@@ -1387,20 +1410,60 @@ function App() {
             {/* Message/Templates tab */}
             {agentPropertyTab === 'templates' && (
               <div>
-                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '16px' }}>Send a message to the landlord using one of your templates.</p>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '16px' }}>Send a message to the landlord. Placeholders are automatically filled in.</p>
                 {agentTemplates.length === 0 ? (
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
                     <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 12px' }}>No templates yet — create them in the Templates section</p>
                   </div>
-                ) : agentTemplates.map(t => (
-                  <div key={t.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>{t.title}</p>
-                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>{t.body}</p>
+                ) : agentTemplates.map(t => {
+                  const nextExpiry = selectedAgentPropertyDocs.filter(d => d.expiry_date).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
+                  const populatedBody = t.body
+                    .replace(/\[property_address\]/g, selectedAgentProperty.address_line_1)
+                    .replace(/\[expiry_date\]/g, nextExpiry ? new Date(nextExpiry.expiry_date).toLocaleDateString('en-GB') : '[expiry date]')
+                    .replace(/\[agency_name\]/g, userRecord?.agency_name || 'Your Agent');
+                  return (
+                    <div key={t.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px 20px', marginBottom: '10px' }}>
+                      <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>{t.title}</p>
+                      <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{populatedBody}</p>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <a href={`mailto:${propLandlord?.email || ''}?subject=${encodeURIComponent(t.title)}&body=${encodeURIComponent(populatedBody)}`} style={{ padding: '7px 14px', background: blue, color: 'white', borderRadius: '7px', fontSize: '12px', fontFamily: font, fontWeight: '700', textDecoration: 'none' }}>Send Email</a>
+                        <button onClick={() => navigator.clipboard.writeText(populatedBody)} style={{ padding: '7px 14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '7px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Copy</button>
+                      </div>
                     </div>
-                    <a href={`mailto:${propLandlord?.email || ''}?subject=${encodeURIComponent(t.title)}&body=${encodeURIComponent(t.body)}`} style={{ padding: '8px 16px', background: blue, color: 'white', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', textDecoration: 'none', whiteSpace: 'nowrap' }}>Send Email</a>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Audit Log tab */}
+            {agentPropertyTab === 'audit' && (
+              <div>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '16px' }}>Timeline of activity for this property.</p>
+                <div style={{ position: 'relative', paddingLeft: '20px', borderLeft: '2px solid rgba(43,124,211,0.3)' }}>
+                  {selectedAgentPropertyDocs.map(doc => (
+                    <div key={doc.id} style={{ marginBottom: '16px', position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: '-25px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: blue }} />
+                      <p style={{ margin: '0 0 2px', color: 'white', fontSize: '13px', fontWeight: '600' }}>📄 {doc.document_type} uploaded</p>
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{doc.created_at ? new Date(doc.created_at).toLocaleString('en-GB') : 'Date unknown'}</p>
+                    </div>
+                  ))}
+                  {agentNotes.map(note => (
+                    <div key={note.id} style={{ marginBottom: '16px', position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: '-25px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: '#a78bfa' }} />
+                      <p style={{ margin: '0 0 2px', color: 'white', fontSize: '13px', fontWeight: '600' }}>📝 Agent note added</p>
+                      <p style={{ margin: '0 0 2px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontStyle: 'italic' }}>"{note.note.substring(0, 60)}{note.note.length > 60 ? '...' : ''}"</p>
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{new Date(note.created_at).toLocaleString('en-GB')}</p>
+                    </div>
+                  ))}
+                  <div style={{ marginBottom: '16px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: '-25px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                    <p style={{ margin: '0 0 2px', color: 'white', fontSize: '13px', fontWeight: '600' }}>👁️ Agent viewed property</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Just now</p>
                   </div>
-                ))}
+                  {selectedAgentPropertyDocs.length === 0 && agentNotes.length === 0 && (
+                    <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No activity recorded yet</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
