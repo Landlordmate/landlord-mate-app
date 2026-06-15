@@ -583,6 +583,11 @@ function App() {
   const [propertyNotes, setPropertyNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
   const [todos, setTodos] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [newInventoryRoom, setNewInventoryRoom] = useState('');
+  const [newInventoryItem, setNewInventoryItem] = useState('');
+  const [newInventoryCondition, setNewInventoryCondition] = useState('Good');
+  const [newInventoryNotes, setNewInventoryNotes] = useState('');
   const [newTodo, setNewTodo] = useState('');
   const [expenses, setExpenses] = useState([]);
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -1071,6 +1076,7 @@ function App() {
     setPropertyNotes(property.notes || '');
     setNotesSaved(false);
     setTodos(property.todos ? JSON.parse(property.todos) : []);
+    setInventory(property.inventory ? JSON.parse(property.inventory) : []);
     setExpenses(property.expenses ? JSON.parse(property.expenses) : []);
     setTenancyStart(property.tenancy_start || '');
     setTenancyEnd(property.tenancy_end || '');
@@ -1110,6 +1116,28 @@ function App() {
     const updated = todos.filter(t => t.id !== id);
     setTodos(updated);
     await supabase.from('properties').update({ todos: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleAddInventoryItem = async () => {
+    if (!newInventoryItem.trim() || !newInventoryRoom.trim()) return;
+    const item = { id: Date.now(), room: newInventoryRoom.trim(), item: newInventoryItem.trim(), condition: newInventoryCondition, notes: newInventoryNotes.trim() };
+    const updated = [...inventory, item];
+    setInventory(updated);
+    setNewInventoryItem(''); setNewInventoryNotes('');
+    await supabase.from('properties').update({ inventory: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleDeleteInventoryItem = async (id) => {
+    const updated = inventory.filter(i => i.id !== id);
+    setInventory(updated);
+    await supabase.from('properties').update({ inventory: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handlePrintInventory = () => {
+    const rooms = [...new Set(inventory.map(i => i.room))];
+    const w = window.open('', '_blank');
+    w.document.write(`<html><head><title>Inventory Report - ${selectedProperty?.address_line_1}</title><style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 8px;border-bottom:2px solid #0f1e30;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin-bottom:16px}th{background:#0f1e30;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}.good{color:#22c55e;font-weight:700}.fair{color:#eab308;font-weight:700}.poor{color:#ef4444;font-weight:700}.footer{margin-top:40px;font-size:11px;color:#999;border-top:1px solid #e2e8f0;padding-top:12px}</style></head><body><h1>Inventory Report</h1><p style="color:#666;font-size:13px">${selectedProperty?.address_line_1} · Generated ${new Date().toLocaleDateString('en-GB')}</p>${rooms.map(room => `<h2>${room}</h2><table><tr><th>Item</th><th>Condition</th><th>Notes</th></tr>${inventory.filter(i => i.room === room).map(i => `<tr><td>${i.item}</td><td class="${i.condition.toLowerCase()}">${i.condition}</td><td>${i.notes || '-'}</td></tr>`).join('')}</table>`).join('')}<div class="footer">Inventory Report · The Landlord Mate · thelandlordmate.com · ${new Date().toLocaleDateString('en-GB')}</div></body></html>`);
+    w.print();
   };
 
   const handleAddExpense = async () => {
@@ -1891,6 +1919,50 @@ function App() {
                 <input type="checkbox" checked={todo.done} onChange={() => handleToggleTodo(todo.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }} />
                 <span style={{ flex: 1, color: todo.done ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '14px', textDecoration: todo.done ? 'line-through' : 'none' }}>{todo.text}</span>
                 <button onClick={() => handleDeleteTodo(todo.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {/* INVENTORY */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>📋 Inventory</p>
+              {inventory.length > 0 && <button onClick={handlePrintInventory} style={{ padding: '4px 10px', background: 'rgba(43,124,211,0.15)', color: blue, border: 'none', borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🖨️ Print Report</button>}
+            </div>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Log the condition of items and rooms — useful for move-in/move-out and deposit disputes.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <input type="text" placeholder="Room (e.g. Kitchen, Bedroom 1)" value={newInventoryRoom} onChange={e => setNewInventoryRoom(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} />
+              <input type="text" placeholder="Item (e.g. Oven, Sofa)" value={newInventoryItem} onChange={e => setNewInventoryItem(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+              <select value={newInventoryCondition} onChange={e => setNewInventoryCondition(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }}>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+                <option value="Poor">Poor</option>
+                <option value="New">New</option>
+              </select>
+              <input type="text" placeholder="Notes (optional)" value={newInventoryNotes} onChange={e => setNewInventoryNotes(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} />
+              <button onClick={handleAddInventoryItem} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Item</button>
+            </div>
+
+            {inventory.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', margin: 0 }}>No items logged yet</p>}
+
+            {[...new Set(inventory.map(i => i.room))].map(room => (
+              <div key={room} style={{ marginBottom: '12px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 6px' }}>{room}</p>
+                {inventory.filter(i => i.room === room).map(item => {
+                  const condColor = item.condition === 'Good' || item.condition === 'New' ? '#22c55e' : item.condition === 'Fair' ? '#eab308' : '#ef4444';
+                  return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: condColor, flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: 'white', fontSize: '13px' }}>{item.item}</span>
+                      <span style={{ color: condColor, fontSize: '12px', fontWeight: '700' }}>{item.condition}</span>
+                      {item.notes && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{item.notes}</span>}
+                      <button onClick={() => handleDeleteInventoryItem(item.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Remove</button>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
