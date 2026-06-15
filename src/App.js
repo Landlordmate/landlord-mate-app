@@ -1539,17 +1539,25 @@ function App() {
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '700', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Your letter — edit as needed</p>
-                <textarea
-                  value={editableLetter || generateLetter(selectedLetter)}
-                  onChange={(e) => setEditableLetter(e.target.value)}
-                  rows={20}
-                  style={{ width: '100%', padding: '16px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'Georgia, serif', lineHeight: '1.8', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
-                />
+                {!editableLetter && (
+                  <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '12px' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Fill in the details above, then click Generate</p>
+                    <button onClick={() => setEditableLetter(generateLetter(selectedLetter))} style={{ padding: '10px 24px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Generate Letter →</button>
+                  </div>
+                )}
+                {editableLetter && (
+                  <textarea
+                    value={editableLetter}
+                    onChange={(e) => setEditableLetter(e.target.value)}
+                    rows={20}
+                    style={{ width: '100%', padding: '16px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'Georgia, serif', lineHeight: '1.8', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
+                  />
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => { navigator.clipboard.writeText(editableLetter || generateLetter(selectedLetter)); }} style={{ ...primaryBtn, flex: 1 }}>📋 Copy Letter</button>
-                <button onClick={() => { const txt = editableLetter || generateLetter(selectedLetter); const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${txt}</pre></body></html>`); w.print(); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🖨️ Print</button>
+                <button onClick={() => { navigator.clipboard.writeText(editableLetter); }} disabled={!editableLetter} style={{ ...primaryBtn, flex: 1, opacity: editableLetter ? 1 : 0.4 }}>📋 Copy Letter</button>
+                <button onClick={() => { const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${editableLetter}</pre></body></html>`); w.print(); }} disabled={!editableLetter} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: editableLetter ? 'pointer' : 'not-allowed', opacity: editableLetter ? 1 : 0.4 }}>🖨️ Print</button>
                 <button onClick={() => setEditableLetter('')} style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>↩ Reset</button>
               </div>
               </div>
