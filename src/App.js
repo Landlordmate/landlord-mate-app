@@ -1555,7 +1555,6 @@ function App() {
                 <button onClick={() => { const txt = editableLetter || generateLetter(selectedLetter); const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${txt}</pre></body></html>`); w.print(); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🖨️ Print</button>
                 <button onClick={() => setEditableLetter('')} style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>↩ Reset</button>
               </div>
-              </div>
             </div>
           )}
         </div>
