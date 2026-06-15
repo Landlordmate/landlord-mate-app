@@ -1473,29 +1473,30 @@ function App() {
     );
   }
 
-  const letterTemplates = [
-    { id: 'rent_increase', title: '📈 Rent Increase Notice', desc: 'Formal notice to tenant of rent increase' },
-    { id: 'entry_notice', title: '🔑 Entry Notice', desc: '24-hour notice to enter the property' },
-    { id: 'end_tenancy', title: '🏁 End of Tenancy Letter', desc: 'Confirmation that tenancy is ending' },
-    { id: 'deposit_return', title: '💰 Deposit Return Letter', desc: 'Confirm deposit return to tenant' },
-    { id: 'renewal', title: '🔄 Tenancy Renewal Letter', desc: 'Offer to renew the tenancy' },
-    { id: 'arrears', title: '⚠️ Rent Arrears Letter', desc: 'Formal notice of outstanding rent' },
-  ];
-
-  const generateLetter = (id) => {
-    const today = new Date().toLocaleDateString('en-GB');
-    switch(id) {
-      case 'rent_increase': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Rent Increase — ${letterProperty || '[Property Address]'}\n\nI am writing to inform you that the rent for the above property will increase from £${letterRent || '[Current Rent]'} per month to £${letterNewRent || '[New Rent]'} per month.\n\nThis change will take effect from ${letterEffectiveDate || '[Effective Date]'}.\n\nPlease ensure that any standing order or direct debit is updated accordingly before this date.\n\nIf you have any questions, please do not hesitate to contact me.\n\nYours sincerely,\n\n[Your Name]\n[Your Address]\n[Your Phone]`;
-      case 'entry_notice': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Notice of Entry — ${letterProperty || '[Property Address]'}\n\nI am writing to give you notice that I will need to access the above property on [Date] at [Time].\n\nThe reason for entry is: [Reason — e.g. annual gas safety inspection]\n\nAs required by law, I am giving you at least 24 hours written notice of this visit. If this time is not convenient, please contact me as soon as possible so we can arrange an alternative.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
-      case 'end_tenancy': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: End of Tenancy — ${letterProperty || '[Property Address]'}\n\nI am writing to confirm that your tenancy at the above address will end on [End Date].\n\nPlease ensure that:\n• All keys are returned by [End Date]\n• The property is left clean and in good condition\n• All personal belongings are removed\n• Final meter readings are provided\n\nA checkout inspection will be carried out and your deposit will be returned, less any agreed deductions, within [X] days.\n\nThank you for your tenancy.\n\nYours sincerely,\n\n[Your Name]`;
-      case 'deposit_return': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Deposit Return — ${letterProperty || '[Property Address]'}\n\nFollowing the end of your tenancy at the above property, I am pleased to confirm that your deposit of £[Amount] is being returned to you in full / less deductions as outlined below.\n\n[List any deductions here, or delete this line]\n\nTotal amount being returned: £[Amount]\n\nThis will be transferred to your bank account within [X] days.\n\nThank you for your tenancy.\n\nYours sincerely,\n\n[Your Name]`;
-      case 'renewal': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Tenancy Renewal — ${letterProperty || '[Property Address]'}\n\nI hope you are well. I am writing to offer you a renewal of your tenancy at the above property.\n\nI would like to offer a new fixed-term tenancy from [Start Date] to [End Date] at a rent of £${letterNewRent || '[Rent]'} per month.\n\nPlease let me know whether you would like to accept this offer by [Response Date].\n\nIf you have any questions, please do not hesitate to get in touch.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
-      case 'arrears': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Rent Arrears — ${letterProperty || '[Property Address]'}\n\nI am writing to inform you that your rent account is currently in arrears.\n\nTotal amount outstanding: £[Amount]\n\nThis debt relates to unpaid rent for the period [Period].\n\nI ask that you make payment of the outstanding amount immediately. If you are experiencing financial difficulties, please contact me as soon as possible so we can discuss your situation.\n\nIf payment is not received within 14 days, I may have no option but to take further action.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
-      default: return '';
-    }
-  };
-
   if (user && screen === 'letters') {
+
+    const templates = [
+      { id: 'rent_increase', title: '📈 Rent Increase Notice', desc: 'Formal notice to tenant of rent increase' },
+      { id: 'entry_notice', title: '🔑 Entry Notice', desc: '24-hour notice to enter the property' },
+      { id: 'end_tenancy', title: '🏁 End of Tenancy Letter', desc: 'Confirmation that tenancy is ending' },
+      { id: 'deposit_return', title: '💰 Deposit Return Letter', desc: 'Confirm deposit return to tenant' },
+      { id: 'renewal', title: '🔄 Tenancy Renewal Letter', desc: 'Offer to renew the tenancy' },
+      { id: 'arrears', title: '⚠️ Rent Arrears Letter', desc: 'Formal notice of outstanding rent' },
+    ];
+
+    const generateLetter = (id) => {
+      const today = new Date().toLocaleDateString('en-GB');
+      switch(id) {
+        case 'rent_increase': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Rent Increase — ${letterProperty || '[Property Address]'}\n\nI am writing to inform you that the rent for the above property will increase from £${letterRent || '[Current Rent]'} per month to £${letterNewRent || '[New Rent]'} per month.\n\nThis change will take effect from ${letterEffectiveDate || '[Effective Date]'}.\n\nPlease ensure that any standing order or direct debit is updated accordingly before this date.\n\nIf you have any questions, please do not hesitate to contact me.\n\nYours sincerely,\n\n[Your Name]\n[Your Address]\n[Your Phone]`;
+        case 'entry_notice': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Notice of Entry — ${letterProperty || '[Property Address]'}\n\nI am writing to give you notice that I will need to access the above property on [Date] at [Time].\n\nThe reason for entry is: [Reason — e.g. annual gas safety inspection]\n\nAs required by law, I am giving you at least 24 hours written notice of this visit. If this time is not convenient, please contact me as soon as possible so we can arrange an alternative.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
+        case 'end_tenancy': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: End of Tenancy — ${letterProperty || '[Property Address]'}\n\nI am writing to confirm that your tenancy at the above address will end on [End Date].\n\nPlease ensure that:\n• All keys are returned by [End Date]\n• The property is left clean and in good condition\n• All personal belongings are removed\n• Final meter readings are provided\n\nA checkout inspection will be carried out and your deposit will be returned, less any agreed deductions, within [X] days.\n\nThank you for your tenancy.\n\nYours sincerely,\n\n[Your Name]`;
+        case 'deposit_return': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Deposit Return — ${letterProperty || '[Property Address]'}\n\nFollowing the end of your tenancy at the above property, I am pleased to confirm that your deposit of £[Amount] is being returned to you in full / less deductions as outlined below.\n\n[List any deductions here, or delete this line]\n\nTotal amount being returned: £[Amount]\n\nThis will be transferred to your bank account within [X] days.\n\nThank you for your tenancy.\n\nYours sincerely,\n\n[Your Name]`;
+        case 'renewal': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Tenancy Renewal — ${letterProperty || '[Property Address]'}\n\nI hope you are well. I am writing to offer you a renewal of your tenancy at the above property.\n\nI would like to offer a new fixed-term tenancy from [Start Date] to [End Date] at a rent of £${letterNewRent || '[Rent]'} per month.\n\nPlease let me know whether you would like to accept this offer by [Response Date].\n\nIf you have any questions, please do not hesitate to get in touch.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
+        case 'arrears': return `${today}\n\nDear ${letterTenant || '[Tenant Name]'},\n\nRe: Rent Arrears — ${letterProperty || '[Property Address]'}\n\nI am writing to inform you that your rent account is currently in arrears.\n\nTotal amount outstanding: £[Amount]\n\nThis debt relates to unpaid rent for the period [Period].\n\nI ask that you make payment of the outstanding amount immediately. If you are experiencing financial difficulties, please contact me as soon as possible so we can discuss your situation.\n\nIf payment is not received within 14 days, I may have no option but to take further action.\n\nYours sincerely,\n\n[Your Name]\n[Your Phone]`;
+        default: return '';
+      }
+    };
+
     return (
       <AppShell screen="letters" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
@@ -1505,7 +1506,7 @@ function App() {
           {!selectedLetter ? (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
               {letterTemplates.map(t => (
-                <div key={t.id} onClick={() => setSelectedLetter(t.id)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s' }}
+                <div key={t.id} onClick={() => { setSelectedLetter(t.id); setEditableLetter(generateLetter(t.id)); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}>
                   <p style={{ margin: '0 0 6px', color: 'white', fontWeight: '700', fontSize: '15px' }}>{t.title}</p>
@@ -1516,7 +1517,7 @@ function App() {
           ) : (
             <div>
               <button onClick={() => { setSelectedLetter(null); setEditableLetter(''); }} style={{ color: 'rgba(255,255,255,0.6)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', fontFamily: font, marginBottom: '20px', padding: 0 }}>← Back to templates</button>
-              <h2 style={{ color: 'white', fontWeight: '800', fontSize: '16px', marginBottom: '16px' }}>{templates.find(t => t.id === selectedLetter)?.title}</h2>
+              <h2 style={{ color: 'white', fontWeight: '800', fontSize: '16px', marginBottom: '16px' }}>{letterTemplates.find(t => t.id === selectedLetter)?.title}</h2>
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '700', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Fill in the details</p>
@@ -1538,25 +1539,17 @@ function App() {
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '700', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Your letter — edit as needed</p>
-                {!editableLetter && (
-                  <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '12px' }}>
-                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Fill in the details above, then click Generate</p>
-                    <button onClick={() => setEditableLetter(generateLetter(selectedLetter))} style={{ padding: '10px 24px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Generate Letter →</button>
-                  </div>
-                )}
-                {editableLetter && (
-                  <textarea
-                    value={editableLetter}
-                    onChange={(e) => setEditableLetter(e.target.value)}
-                    rows={20}
-                    style={{ width: '100%', padding: '16px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'Georgia, serif', lineHeight: '1.8', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
-                  />
-                )}
+                <textarea
+                  value={editableLetter}
+                  onChange={(e) => setEditableLetter(e.target.value)}
+                  rows={20}
+                  style={{ width: '100%', padding: '16px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'Georgia, serif', lineHeight: '1.8', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
+                />
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => { navigator.clipboard.writeText(editableLetter); }} disabled={!editableLetter} style={{ ...primaryBtn, flex: 1, opacity: editableLetter ? 1 : 0.4 }}>📋 Copy Letter</button>
-                <button onClick={() => { const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${editableLetter}</pre></body></html>`); w.print(); }} disabled={!editableLetter} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: editableLetter ? 'pointer' : 'not-allowed', opacity: editableLetter ? 1 : 0.4 }}>🖨️ Print</button>
+                <button onClick={() => { navigator.clipboard.writeText(editableLetter || generateLetter(selectedLetter)); }} style={{ ...primaryBtn, flex: 1 }}>📋 Copy Letter</button>
+                <button onClick={() => { const txt = editableLetter || generateLetter(selectedLetter); const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${txt}</pre></body></html>`); w.print(); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🖨️ Print</button>
                 <button onClick={() => setEditableLetter('')} style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>↩ Reset</button>
               </div>
               </div>
