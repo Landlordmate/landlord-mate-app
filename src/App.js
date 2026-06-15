@@ -567,6 +567,8 @@ function App() {
   const [shareLink, setShareLink] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
+  const [propertyNotes, setPropertyNotes] = useState('');
+  const [notesSaved, setNotesSaved] = useState(false);
   const [editExpiry, setEditExpiry] = useState('');
   const [editDocType, setEditDocType] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -832,9 +834,20 @@ function App() {
   const handleSelectProperty = async (property) => {
     setSelectedProperty(property);
     setShareLink('');
+    setPropertyNotes(property.notes || '');
+    setNotesSaved(false);
     const { data } = await supabase.from('documents').select('*').eq('property_id', property.id);
     if (data) setDocuments(data);
     setScreen('property');
+  };
+
+  const handleSaveNotes = async () => {
+    const { error } = await supabase.from('properties').update({ notes: propertyNotes }).eq('id', selectedProperty.id);
+    if (!error) {
+      setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, notes: propertyNotes } : p));
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 3000);
+    }
   };
 
   const handleGenerateShareLink = async () => {
@@ -987,6 +1000,24 @@ function App() {
             {shareLink && <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all' }}>{shareLink}</div>}
             <button onClick={handleGenerateShareLink} style={{ background: shareCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               {shareCopied ? '✓ Link copied!' : shareLink ? 'Generate new link' : 'Generate share link'}
+            </button>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>📝 Property Notes</p>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Add notes about this property — boiler location, tenant contact, access codes, snagging etc.</p>
+            <textarea
+              value={propertyNotes}
+              onChange={(e) => { setPropertyNotes(e.target.value); setNotesSaved(false); }}
+              placeholder="e.g. Boiler is in the kitchen cupboard. Tenant contact: John 07700 900000. Spare key with neighbour at No.25."
+              rows={4}
+              style={{ width: '100%', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', fontFamily: font, boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
+            />
+            <button
+              onClick={handleSaveNotes}
+              style={{ marginTop: '8px', padding: '8px 20px', background: notesSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}
+            >
+              {notesSaved ? '✓ Saved!' : 'Save Notes'}
             </button>
           </div>
 
