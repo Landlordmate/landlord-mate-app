@@ -560,6 +560,7 @@ function App() {
   const [newPostcode, setNewPostcode] = useState('');
   const [newType, setNewType] = useState('house');
   const [newCountry, setNewCountry] = useState('Wales');
+  const [newAgentEmail, setNewAgentEmail] = useState('');
   const [addressResults, setAddressResults] = useState([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState('');
@@ -628,6 +629,14 @@ function App() {
   const [showHomeBanner, setShowHomeBanner] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [accountType, setAccountType] = useState('landlord');
+  const [agencyName, setAgencyName] = useState('');
+  const [agentData, setAgentData] = useState(null);
+  const [agentLandlords, setAgentLandlords] = useState([]);
+  const [agentProperties, setAgentProperties] = useState([]);
+  const [agentDocuments, setAgentDocuments] = useState([]);
+  const [agentFilter, setAgentFilter] = useState('all');
+  const [inviteCopied, setInviteCopied] = useState(false);
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
 
@@ -677,7 +686,39 @@ function App() {
 
   const loadUserRecord = async (userId) => {
     const { data } = await supabase.from('users').select('*').eq('id', userId).single();
-    if (data) setUserRecord(data);
+    if (data) {
+      setUserRecord(data);
+      if (data.account_type === 'agent') {
+        loadAgentData(data);
+      }
+    }
+  };
+
+  const loadAgentData = async (agentRecord) => {
+    setAgentData(agentRecord);
+    // Load all landlords linked to this agent
+    const { data: landlords } = await supabase.from('users').select('*').eq('account_type', 'landlord');
+    if (!landlords) return;
+    
+    // Load all properties with this agent's email
+    const { data: props } = await supabase.from('properties').select('*').eq('agent_email', agentRecord.email);
+    if (!props) return;
+    setAgentProperties(props);
+    
+    // Load all documents for these properties
+    if (props.length > 0) {
+      const allDocs = [];
+      for (const p of props) {
+        const { data: docs } = await supabase.from('documents').select('*').eq('property_id', p.id);
+        if (docs) allDocs.push(...docs);
+      }
+      setAgentDocuments(allDocs);
+    }
+    
+    // Match landlords to properties
+    const landlordIds = [...new Set(props.map(p => p.user_id))];
+    const linkedLandlords = landlords.filter(l => landlordIds.includes(l.id));
+    setAgentLandlords(linkedLandlords);
   };
 
   const handleSubscribe = async (priceId) => {
@@ -781,7 +822,13 @@ function App() {
     if (authUser) {
       const { data: existing } = await supabase.from('users').select('id').eq('id', authUser.id).single();
       if (!existing) {
-        const { error: insertError } = await supabase.from('users').insert([{ id: authUser.id, email: email, account_type: 'landlord' }]);
+        const { error: insertError } = await supabase.from('users').insert([{ 
+          id: authUser.id, 
+          email: email, 
+          account_type: accountType,
+          agency_name: accountType === 'agent' ? agencyName : null,
+          agent_code: accountType === 'agent' ? authUser.id.split('-')[0] : null
+        }]);
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
 
@@ -832,13 +879,13 @@ function App() {
 
   const handleSaveProperty = async () => {
     if (!newAddress) { alert('Please select an address.'); return; }
-    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry }]).select();
+    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry, agent_email: newAgentEmail || null }]).select();
     if (error) { alert(error.message); return; }
     if (data) {
       const newProps = [...properties, data[0]];
       setProperties(newProps);
       await loadAllDocuments(newProps);
-      setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales');
+      setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail('');
     }
   };
 
@@ -1020,6 +1067,7 @@ function App() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const shareToken = urlParams.get("share");
+  const agentCodeFromUrl = urlParams.get("agent");
   if (shareToken) return <AgentView token={shareToken} />;
 
   if (loading) {
@@ -1064,6 +1112,157 @@ function App() {
   // Hard paywall — trial expired and not subscribed
   if (user && trialExpired) {
     return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
+  }
+
+  // AGENT DASHBOARD
+  if (user && userRecord?.account_type === 'agent') {
+    const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
+    
+    const getPortfolioStats = () => {
+      const expired = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
+      const urgent = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
+      const soon = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').length;
+      const good = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good').length;
+      return { expired, urgent, soon, good };
+    };
+
+    const stats = getPortfolioStats();
+
+    const getPropertyHealth = (propertyId) => {
+      const docs = agentDocuments.filter(d => d.property_id === propertyId);
+      if (docs.length === 0) return { color: '#666', label: 'No docs', type: 'none' };
+      const expired = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
+      const urgent = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
+      const soon = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
+      if (expired || urgent) return { color: '#ef4444', label: 'Action Needed', type: 'red' };
+      if (soon) return { color: '#eab308', label: 'Expiring Soon', type: 'amber' };
+      return { color: '#22c55e', label: 'Compliant', type: 'green' };
+    };
+
+    const getNextExpiry = (propertyId) => {
+      const docs = agentDocuments.filter(d => d.property_id === propertyId && d.expiry_date);
+      if (docs.length === 0) return null;
+      const sorted = docs.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+      return sorted[0];
+    };
+
+    const getLandlordForProperty = (property) => {
+      return agentLandlords.find(l => l.id === property.user_id);
+    };
+
+    const filteredProperties = agentProperties.filter(p => {
+      const health = getPropertyHealth(p.id);
+      if (agentFilter === 'red') return health.type === 'red';
+      if (agentFilter === 'amber') return health.type === 'amber';
+      if (agentFilter === 'green') return health.type === 'green';
+      if (agentFilter === 'none') return health.type === 'none';
+      return true;
+    });
+
+    return (
+      <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+        {/* Agent Header */}
+        <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
+            <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
+            <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Dashboard'}</span>
+            <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
+          </div>
+          <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+        </div>
+
+        <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+          {/* Welcome */}
+          <div style={{ marginBottom: '28px' }}>
+            <h1 style={{ color: 'white', fontWeight: '900', fontSize: '26px', margin: '0 0 4px' }}>Portfolio Overview 📊</h1>
+            <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '13px' }}>{agentProperties.length} properties · {agentLandlords.length} landlords</p>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Properties', value: agentProperties.length, color: blue, sub: 'In your portfolio' },
+              { label: 'Action Needed', value: stats.expired + stats.urgent, color: '#ef4444', sub: 'Expired or urgent' },
+              { label: 'Expiring Soon', value: stats.soon, color: '#eab308', sub: 'Within 90 days' },
+              { label: 'Compliant', value: stats.good, color: '#22c55e', sub: 'All good' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px 24px', flex: 1, minWidth: '160px' }}>
+                <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
+                <p style={{ margin: '0 0 4px', color: s.color, fontSize: '36px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{s.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Invite Link */}
+          <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px' }}>
+            <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>🔗 Your Landlord Invitation Link</p>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Share this with your landlords — when they sign up via this link they're automatically linked to your portfolio.</p>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ background: 'rgba(255,255,255,0.06)', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', flex: 1, wordBreak: 'break-all' }}>{inviteLink}</div>
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 16px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {inviteCopied ? '✓ Copied!' : 'Copy Link'}
+              </button>
+            </div>
+          </div>
+
+          {/* Filter */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'all', label: 'All Properties' },
+              { id: 'red', label: '🔴 Action Needed' },
+              { id: 'amber', label: '🟡 Expiring Soon' },
+              { id: 'green', label: '🟢 Compliant' },
+              { id: 'none', label: '⚫ No Documents' },
+            ].map(f => (
+              <button key={f.id} onClick={() => setAgentFilter(f.id)} style={{ padding: '6px 14px', background: agentFilter === f.id ? blue : 'rgba(255,255,255,0.06)', color: agentFilter === f.id ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentFilter === f.id ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+                {f.label} {f.id !== 'all' && `(${f.id === 'red' ? stats.expired + stats.urgent : f.id === 'amber' ? stats.soon : f.id === 'green' ? stats.good : agentProperties.filter(p => getPropertyHealth(p.id).type === 'none').length})`}
+              </button>
+            ))}
+          </div>
+
+          {/* Properties Table */}
+          {agentProperties.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '60px 24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '40px', margin: '0 0 12px' }}>🏠</p>
+              <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No properties linked yet</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 20px' }}>Share your invitation link with landlords to get started</p>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
+              {/* Table header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1.5fr 1fr', gap: '0', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
+                {['Property', 'Landlord', 'Health', 'Next Expiry', 'Days Left'].map(h => (
+                  <p key={h} style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</p>
+                ))}
+              </div>
+              {filteredProperties.map((property, i) => {
+                const health = getPropertyHealth(property.id);
+                const nextExpiry = getNextExpiry(property.id);
+                const landlord = getLandlordForProperty(property);
+                const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
+                return (
+                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1.5fr 1fr', gap: '0', padding: '14px 20px', borderBottom: i < filteredProperties.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
+                      <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+                    </div>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{landlord?.email || '—'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: health.color, flexShrink: 0 }} />
+                      <span style={{ color: health.color, fontSize: '12px', fontWeight: '700' }}>{health.label}</span>
+                    </div>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{nextExpiry ? `${nextExpiry.document_type}` : '—'}</p>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: status?.color || 'rgba(255,255,255,0.3)' }}>{status ? status.label : '—'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (user && showOnboarding) {
@@ -1401,9 +1600,11 @@ function App() {
                 <option value="flat">Flat</option>
                 <option value="hmo">HMO</option>
               </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional)</span></label>
+              <input type="email" placeholder="e.g. agent@shepherdsharpe.co.uk" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} style={inputStyle} />
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={handleSaveProperty} style={{ ...primaryBtn, flex: 1 }}>Save Property</button>
-                <button onClick={() => { setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail(''); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
           )}
@@ -1899,7 +2100,20 @@ function App() {
             <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Create your account</h1>
-          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '24px', marginTop: '-8px' }}>Start managing your properties for free</p>
+          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>Start your 14-day free trial</p>
+
+          {/* Account type selector */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <button onClick={() => setAccountType('landlord')} style={{ flex: 1, padding: '10px', background: accountType === 'landlord' ? '#0f1e30' : '#f8fafc', color: accountType === 'landlord' ? 'white' : '#666', border: `2px solid ${accountType === 'landlord' ? '#0f1e30' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              🏠 I'm a Landlord
+            </button>
+            <button onClick={() => setAccountType('agent')} style={{ flex: 1, padding: '10px', background: accountType === 'agent' ? '#0f1e30' : '#f8fafc', color: accountType === 'agent' ? 'white' : '#666', border: `2px solid ${accountType === 'agent' ? '#0f1e30' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              🏢 I'm a Letting Agent
+            </button>
+          </div>
+          {accountType === 'agent' && (
+            <input type="text" placeholder="Agency name (e.g. Shepherd Sharpe)" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} style={lightInputStyle} />
+          )}
           {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
           <input type="text" placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} style={lightInputStyle} />
           <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} style={lightInputStyle} />
