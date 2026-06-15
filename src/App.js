@@ -430,7 +430,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
   );
 }
 
-function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe }) {
+function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport }) {
   const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
   const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
   const soonDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
@@ -482,6 +482,14 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
       </div>
 
       {documents.length > 0 && <CompliancePieChart documents={documents} />}
+
+      {properties.length > 0 && (
+        <div style={{ marginBottom: '24px', textAlign: 'right' }}>
+          <button onClick={onPrintReport} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+            🖨️ Print Compliance Report
+          </button>
+        </div>
+      )}
 
       {actionNeeded.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
@@ -569,6 +577,20 @@ function App() {
   const [editingDoc, setEditingDoc] = useState(null);
   const [propertyNotes, setPropertyNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
+  const [todos, setTodos] = useState([]);
+  const [newTodo, setNewTodo] = useState('');
+  const [expenses, setExpenses] = useState([]);
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [expenseDesc, setExpenseDesc] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseDate, setExpenseDate] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('Maintenance');
+  const [tenancyStart, setTenancyStart] = useState('');
+  const [tenancyEnd, setTenancyEnd] = useState('');
+  const [tenantName, setTenantName] = useState('');
+  const [tenantPhone, setTenantPhone] = useState('');
+  const [tenancySaved, setTenancySaved] = useState(false);
+  const [showPrintReport, setShowPrintReport] = useState(false);
   const [editExpiry, setEditExpiry] = useState('');
   const [editDocType, setEditDocType] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -836,6 +858,13 @@ function App() {
     setShareLink('');
     setPropertyNotes(property.notes || '');
     setNotesSaved(false);
+    setTodos(property.todos ? JSON.parse(property.todos) : []);
+    setExpenses(property.expenses ? JSON.parse(property.expenses) : []);
+    setTenancyStart(property.tenancy_start || '');
+    setTenancyEnd(property.tenancy_end || '');
+    setTenantName(property.tenant_name || '');
+    setTenantPhone(property.tenant_phone || '');
+    setShowAddExpense(false);
     const { data } = await supabase.from('documents').select('*').eq('property_id', property.id);
     if (data) setDocuments(data);
     setScreen('property');
@@ -848,6 +877,70 @@ function App() {
       setNotesSaved(true);
       setTimeout(() => setNotesSaved(false), 3000);
     }
+  };
+
+  const handleAddTodo = async () => {
+    if (!newTodo.trim()) return;
+    const todo = { id: Date.now(), text: newTodo.trim(), done: false };
+    const updated = [...todos, todo];
+    setTodos(updated);
+    setNewTodo('');
+    await supabase.from('properties').update({ todos: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleToggleTodo = async (id) => {
+    const updated = todos.map(t => t.id === id ? { ...t, done: !t.done } : t);
+    setTodos(updated);
+    await supabase.from('properties').update({ todos: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleDeleteTodo = async (id) => {
+    const updated = todos.filter(t => t.id !== id);
+    setTodos(updated);
+    await supabase.from('properties').update({ todos: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleAddExpense = async () => {
+    if (!expenseDesc.trim() || !expenseAmount) return;
+    const expense = { id: Date.now(), desc: expenseDesc.trim(), amount: parseFloat(expenseAmount), date: expenseDate || new Date().toISOString().split('T')[0], category: expenseCategory };
+    const updated = [...expenses, expense];
+    setExpenses(updated);
+    setExpenseDesc(''); setExpenseAmount(''); setExpenseDate(''); setExpenseCategory('Maintenance'); setShowAddExpense(false);
+    await supabase.from('properties').update({ expenses: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleDeleteExpense = async (id) => {
+    const updated = expenses.filter(e => e.id !== id);
+    setExpenses(updated);
+    await supabase.from('properties').update({ expenses: JSON.stringify(updated) }).eq('id', selectedProperty.id);
+  };
+
+  const handleExportExpenses = () => {
+    const rows = [['Date', 'Category', 'Description', 'Amount (£)']];
+    expenses.forEach(e => rows.push([e.date, e.category, e.desc, e.amount.toFixed(2)]));
+    const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+    rows.push(['', '', 'TOTAL', total.toFixed(2)]);
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedProperty?.address_line_1 || 'property'}-expenses.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveTenancy = async () => {
+    const { error } = await supabase.from('properties').update({ tenancy_start: tenancyStart || null, tenancy_end: tenancyEnd || null, tenant_name: tenantName, tenant_phone: tenantPhone }).eq('id', selectedProperty.id);
+    if (!error) { setTenancySaved(true); setTimeout(() => setTenancySaved(false), 3000); }
+  };
+
+  const getNoticeDate = (endDate) => {
+    if (!endDate) return null;
+    const end = new Date(endDate);
+    const notice = new Date(end);
+    notice.setDate(notice.getDate() - 56);
+    return notice;
   };
 
   const handleGenerateShareLink = async () => {
@@ -1018,6 +1111,102 @@ function App() {
               style={{ marginTop: '8px', padding: '8px 20px', background: notesSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}
             >
               {notesSaved ? '✓ Saved!' : 'Save Notes'}
+            </button>
+          </div>
+
+          {/* TO-DO LIST */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>✅ To-Do List</p>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Tasks for this property — snagging, repairs, inspections etc.</p>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input type="text" placeholder="Add a task..." value={newTodo} onChange={(e) => setNewTodo(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAddTodo(); }} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <button onClick={handleAddTodo} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Add</button>
+            </div>
+            {todos.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', margin: 0 }}>No tasks yet</p>}
+            {todos.map(todo => (
+              <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <input type="checkbox" checked={todo.done} onChange={() => handleToggleTodo(todo.id)} style={{ width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }} />
+                <span style={{ flex: 1, color: todo.done ? 'rgba(255,255,255,0.3)' : 'white', fontSize: '14px', textDecoration: todo.done ? 'line-through' : 'none' }}>{todo.text}</span>
+                <button onClick={() => handleDeleteTodo(todo.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Remove</button>
+              </div>
+            ))}
+          </div>
+
+          {/* EXPENDITURE TRACKER */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>💰 Expenditure Tracker</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {expenses.length > 0 && <button onClick={handleExportExpenses} style={{ padding: '4px 10px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: 'none', borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Export CSV</button>}
+                <button onClick={() => setShowAddExpense(!showAddExpense)} style={{ padding: '4px 10px', background: blue, color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>+ Add</button>
+              </div>
+            </div>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Log costs for tax returns — repairs, certificates, maintenance etc.</p>
+            {showAddExpense && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', padding: '16px', marginBottom: '12px' }}>
+                <select value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }}>
+                  {['Maintenance', 'Repairs', 'Certificates', 'Insurance', 'Agent Fees', 'Utilities', 'Legal', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="text" placeholder="Description" value={expenseDesc} onChange={(e) => setExpenseDesc(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="number" placeholder="Amount £" value={expenseAmount} onChange={(e) => setExpenseAmount(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+                  <input type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button onClick={handleAddExpense} style={{ ...primaryBtn, flex: 1, padding: '10px' }}>Save Expense</button>
+                  <button onClick={() => setShowAddExpense(false)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {expenses.length === 0 && !showAddExpense && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px', margin: 0 }}>No expenses logged yet</p>}
+            {expenses.map(exp => (
+              <div key={exp.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, color: 'white', fontSize: '13px', fontWeight: '600' }}>{exp.desc}</p>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{exp.category} · {exp.date}</p>
+                </div>
+                <span style={{ color: '#22c55e', fontWeight: '800', fontSize: '14px' }}>£{exp.amount.toFixed(2)}</span>
+                <button onClick={() => handleDeleteExpense(exp.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Remove</button>
+              </div>
+            ))}
+            {expenses.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: '700' }}>Total</span>
+                <span style={{ color: 'white', fontWeight: '900', fontSize: '16px' }}>£{expenses.reduce((sum, e) => sum + e.amount, 0).toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* TENANCY MANAGEMENT */}
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+            <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>🏠 Tenancy Details</p>
+            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Track your tenancy dates and tenant contact details.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600' }}>Tenancy Start</label>
+                <input type="date" value={tenancyStart} onChange={(e) => setTenancyStart(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600' }}>Tenancy End</label>
+                <input type="date" value={tenancyEnd} onChange={(e) => setTenancyEnd(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} />
+              </div>
+            </div>
+            {tenancyEnd && (() => {
+              const noticeDate = getNoticeDate(tenancyEnd);
+              const today = new Date();
+              const daysToNotice = Math.ceil((noticeDate - today) / (1000 * 60 * 60 * 24));
+              return (
+                <div style={{ background: daysToNotice < 30 ? 'rgba(239,68,68,0.1)' : 'rgba(43,124,211,0.1)', border: `1px solid ${daysToNotice < 30 ? 'rgba(239,68,68,0.3)' : 'rgba(43,124,211,0.3)'}`, borderRadius: '8px', padding: '10px 14px', marginBottom: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '12px', color: daysToNotice < 30 ? '#ef4444' : '#7db3e8', fontWeight: '600' }}>
+                    📅 Serve notice by {noticeDate.toLocaleDateString('en-GB')} {daysToNotice < 0 ? '— OVERDUE' : daysToNotice < 30 ? `— ${daysToNotice} days left` : `(${daysToNotice} days away)`}
+                  </p>
+                </div>
+              );
+            })()}
+            <input type="text" placeholder="Tenant name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+            <input type="text" placeholder="Tenant phone" value={tenantPhone} onChange={(e) => setTenantPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+            <button onClick={handleSaveTenancy} style={{ padding: '8px 20px', background: tenancySaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              {tenancySaved ? '✓ Saved!' : 'Save Tenancy Details'}
             </button>
           </div>
 
@@ -1443,6 +1632,94 @@ function App() {
     );
   }
 
+  if (user && showPrintReport) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'white', fontFamily: font, padding: '40px', color: '#0f1e30' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', paddingBottom: '16px', borderBottom: '3px solid #0f1e30' }}>
+            <div>
+              <h1 style={{ margin: '0 0 4px', fontSize: '24px', fontWeight: '900', color: '#0f1e30' }}>The Landlord Mate</h1>
+              <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Compliance Summary Report · {new Date().toLocaleDateString('en-GB')}</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: '0 0 4px', fontSize: '13px', color: '#666' }}>{user?.email}</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'} · {allDocuments.length} documents</p>
+            </div>
+          </div>
+
+          {properties.map(property => {
+            const propDocs = allDocuments.filter(d => d.property_id === property.id);
+            const score = (() => {
+              if (!propDocs || propDocs.length === 0) return 0;
+              let s = 0;
+              const weights = { 'Gas Safety Certificate': 25, 'EICR (Electrical Report)': 20, 'EPC (Energy Performance)': 15, 'HMO Licence': 15, 'Smoke & Carbon Monoxide Alarms': 15, 'Tenancy Agreement': 10 };
+              for (const [docType, points] of Object.entries(weights)) {
+                const match = propDocs.find(d => d.document_type === docType);
+                if (match) {
+                  const status = getExpiryStatus(match.expiry_date);
+                  if (!match.expiry_date || status?.type === 'good') s += points;
+                  else if (status?.type === 'soon') s += Math.round(points * 0.7);
+                  else if (status?.type === 'urgent') s += Math.round(points * 0.3);
+                }
+              }
+              return Math.min(s, 100);
+            })();
+            const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+            return (
+              <div key={property.id} style={{ marginBottom: '32px', padding: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', pageBreakInside: 'avoid' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div>
+                    <h2 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '800', color: '#0f1e30' }}>{property.address_line_1}</h2>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#666', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ margin: 0, fontSize: '28px', fontWeight: '900', color: scoreColor, lineHeight: 1 }}>{score}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: '9px', color: '#666', fontWeight: '700', textTransform: 'uppercase' }}>Health Score</p>
+                  </div>
+                </div>
+                {propDocs.length === 0 ? (
+                  <p style={{ color: '#999', fontSize: '13px' }}>No documents uploaded</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#0f1e30', borderBottom: '1px solid #e2e8f0' }}>Document</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#0f1e30', borderBottom: '1px solid #e2e8f0' }}>Expiry Date</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#0f1e30', borderBottom: '1px solid #e2e8f0' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {propDocs.map(doc => {
+                        const status = getExpiryStatus(doc.expiry_date);
+                        const statusLabel = status ? status.label : 'No expiry set';
+                        const statusColor = status ? status.color : '#999';
+                        return (
+                          <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 12px', color: '#0f1e30', fontWeight: '600' }}>{doc.document_type}</td>
+                            <td style={{ padding: '8px 12px', color: '#666' }}>{doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-GB') : '—'}</td>
+                            <td style={{ padding: '8px 12px' }}><span style={{ color: statusColor, fontWeight: '700', fontSize: '12px' }}>● {statusLabel}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
+
+          <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ margin: 0, fontSize: '11px', color: '#999' }}>Generated by The Landlord Mate · thelandlordmate.com · {new Date().toLocaleDateString('en-GB')}</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowPrintReport(false)} style={{ padding: '8px 16px', background: '#f1f5f9', color: '#0f1e30', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>← Back</button>
+              <button onClick={() => window.print()} style={{ padding: '8px 16px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🖨️ Print</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (user) {
     return (
       <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
@@ -1456,6 +1733,7 @@ function App() {
           trialDaysLeft={trialStatus.daysLeft}
           showTrialNudge={showTrialNudge}
           onSubscribe={() => handleSubscribe(PRICE_IDS.starter)}
+          onPrintReport={() => setShowPrintReport(true)}
           setSelectedProperty={(p) => {
             setSelectedProperty(p);
             const load = async () => {
