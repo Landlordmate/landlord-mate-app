@@ -1535,6 +1535,9 @@ function App() {
                     <input type="text" placeholder="Effective date (e.g. 1 August 2026)" value={letterEffectiveDate} onChange={e => setLetterEffectiveDate(e.target.value)} style={inputStyle} />
                   </>
                 )}
+                <button onClick={() => setEditableLetter(generateLetter(selectedLetter))} style={{ width: '100%', padding: '12px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}>
+                  ↻ Generate / Refresh Letter
+                </button>
               </div>
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
