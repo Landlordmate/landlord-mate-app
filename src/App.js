@@ -637,6 +637,18 @@ function App() {
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [agentSearch, setAgentSearch] = useState('');
+  const [agentScreen, setAgentScreen] = useState('dashboard');
+  const [selectedAgentProperty, setSelectedAgentProperty] = useState(null);
+  const [selectedAgentPropertyDocs, setSelectedAgentPropertyDocs] = useState([]);
+  const [agentPropertyTab, setAgentPropertyTab] = useState('documents');
+  const [agentNotes, setAgentNotes] = useState([]);
+  const [newAgentNote, setNewAgentNote] = useState('');
+  const [agentTemplates, setAgentTemplates] = useState([]);
+  const [showNewTemplate, setShowNewTemplate] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateBody, setTemplateBody] = useState('');
+  const [selectedProperties, setSelectedProperties] = useState([]);
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
 
@@ -719,6 +731,62 @@ function App() {
     const landlordIds = [...new Set(props.map(p => p.user_id))];
     const linkedLandlords = landlords.filter(l => landlordIds.includes(l.id));
     setAgentLandlords(linkedLandlords);
+  };
+
+  const handleSelectAgentProperty = async (property) => {
+    setSelectedAgentProperty(property);
+    setAgentPropertyTab('documents');
+    const { data: docs } = await supabase.from('documents').select('*').eq('property_id', property.id);
+    if (docs) setSelectedAgentPropertyDocs(docs);
+    const { data: notes } = await supabase.from('agent_notes').select('*').eq('property_id', property.id).order('created_at', { ascending: false });
+    if (notes) setAgentNotes(notes);
+    const { data: templates } = await supabase.from('templates').select('*').eq('agent_id', user.id);
+    if (templates) setAgentTemplates(templates);
+    setAgentScreen('property');
+  };
+
+  const handleAddAgentNote = async () => {
+    if (!newAgentNote.trim()) return;
+    const { data } = await supabase.from('agent_notes').insert([{ property_id: selectedAgentProperty.id, agent_id: user.id, note: newAgentNote.trim() }]).select();
+    if (data) { setAgentNotes([data[0], ...agentNotes]); setNewAgentNote(''); }
+  };
+
+  const handleDeleteAgentNote = async (noteId) => {
+    await supabase.from('agent_notes').delete().eq('id', noteId);
+    setAgentNotes(agentNotes.filter(n => n.id !== noteId));
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!templateTitle.trim() || !templateBody.trim()) return;
+    const { data } = await supabase.from('templates').insert([{ agent_id: user.id, title: templateTitle, body: templateBody }]).select();
+    if (data) { setAgentTemplates([...agentTemplates, data[0]]); setTemplateTitle(''); setTemplateBody(''); setShowNewTemplate(false); }
+  };
+
+  const handleDeleteTemplate = async (id) => {
+    await supabase.from('templates').delete().eq('id', id);
+    setAgentTemplates(agentTemplates.filter(t => t.id !== id));
+  };
+
+  const handleAgentExportCSV = () => {
+    const rows = [['Property', 'Landlord', 'Country', 'Health', 'Documents', 'Next Expiry']];
+    agentProperties.forEach(p => {
+      const docs = agentDocuments.filter(d => d.property_id === p.id);
+      const landlord = agentLandlords.find(l => l.id === p.user_id);
+      const expired = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
+      const urgent = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
+      const soon = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
+      const health = expired || urgent ? 'Action Needed' : soon ? 'Expiring Soon' : docs.length === 0 ? 'No Documents' : 'Compliant';
+      const nextDoc = docs.filter(d => d.expiry_date).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
+      rows.push([p.address_line_1, landlord?.email || '—', p.country || '—', health, docs.length, nextDoc ? `${nextDoc.document_type} (${new Date(nextDoc.expiry_date).toLocaleDateString('en-GB')})` : '—']);
+    });
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${userRecord?.agency_name || 'portfolio'}-compliance-export.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSubscribe = async (priceId) => {
@@ -1117,109 +1185,361 @@ function App() {
   // AGENT DASHBOARD
   if (user && userRecord?.account_type === 'agent') {
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
-    
-    const getPortfolioStats = () => {
-      const expired = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
-      const urgent = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
-      const soon = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').length;
-      const good = agentDocuments.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good').length;
-      return { expired, urgent, soon, good };
-    };
 
-    const stats = getPortfolioStats();
-
-    const getPropertyHealth = (propertyId) => {
+    const getHealthScore = (propertyId) => {
       const docs = agentDocuments.filter(d => d.property_id === propertyId);
-      if (docs.length === 0) return { color: '#666', label: 'No docs', type: 'none' };
-      const expired = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
-      const urgent = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
-      const soon = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
-      if (expired || urgent) return { color: '#ef4444', label: 'Action Needed', type: 'red' };
-      if (soon) return { color: '#eab308', label: 'Expiring Soon', type: 'amber' };
-      return { color: '#22c55e', label: 'Compliant', type: 'green' };
+      if (docs.length === 0) return 0;
+      let score = 100;
+      docs.forEach(doc => {
+        const status = getExpiryStatus(doc.expiry_date);
+        if (!status) return;
+        if (status.type === 'expired') score -= 50;
+        else if (status.type === 'urgent') score -= 25;
+        else if (status.type === 'soon') score -= 10;
+      });
+      return Math.max(0, score);
     };
 
+    const getHealthColor = (score) => score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+    const getHealthLabel = (score) => score >= 80 ? 'Compliant' : score >= 50 ? 'Expiring Soon' : 'Action Needed';
+
+    const getLandlordForProperty = (property) => agentLandlords.find(l => l.id === property.user_id);
     const getNextExpiry = (propertyId) => {
       const docs = agentDocuments.filter(d => d.property_id === propertyId && d.expiry_date);
-      if (docs.length === 0) return null;
-      const sorted = docs.sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
-      return sorted[0];
+      if (!docs.length) return null;
+      return docs.sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
     };
 
-    const getLandlordForProperty = (property) => {
-      return agentLandlords.find(l => l.id === property.user_id);
+    const workQueue = {
+      expired: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
+      urgent: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'urgent') && !agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
+      soon: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'soon') && !agentDocuments.some(d => d.property_id === p.id && ['expired','urgent'].includes(getExpiryStatus(d.expiry_date)?.type))),
     };
 
-    const filteredProperties = agentProperties.filter(p => {
-      const health = getPropertyHealth(p.id);
-      if (agentFilter === 'red') return health.type === 'red';
-      if (agentFilter === 'amber') return health.type === 'amber';
-      if (agentFilter === 'green') return health.type === 'green';
-      if (agentFilter === 'none') return health.type === 'none';
-      return true;
+    const filteredAndSearched = agentProperties.filter(p => {
+      const score = getHealthScore(p.id);
+      const landlord = getLandlordForProperty(p);
+      const matchesSearch = !agentSearch || p.address_line_1.toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.email || '').toLowerCase().includes(agentSearch.toLowerCase());
+      const matchesFilter = agentFilter === 'all' || (agentFilter === 'red' && score < 50) || (agentFilter === 'amber' && score >= 50 && score < 80) || (agentFilter === 'green' && score >= 80) || (agentFilter === 'none' && agentDocuments.filter(d => d.property_id === p.id).length === 0);
+      return matchesSearch && matchesFilter;
     });
 
+    const navItems = [
+      { id: 'dashboard', label: '📊 Dashboard' },
+      { id: 'properties', label: '🏠 Properties' },
+      { id: 'templates', label: '📝 Templates' },
+      { id: 'settings', label: '⚙️ Settings' },
+    ];
+
+    // Property detail view
+    if (agentScreen === 'property' && selectedAgentProperty) {
+      const propLandlord = getLandlordForProperty(selectedAgentProperty);
+      const propScore = getHealthScore(selectedAgentProperty.id);
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')}>← Back</span>
+              <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{selectedAgentProperty.address_line_1}</span>
+            </div>
+            <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+          </div>
+
+          <div style={{ padding: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+            {/* Property header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+              <div>
+                <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: '0 0 4px' }}>{selectedAgentProperty.address_line_1}</h1>
+                <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '13px', textTransform: 'capitalize' }}>{selectedAgentProperty.property_type}{selectedAgentProperty.country ? ` · ${selectedAgentProperty.country}` : ''}</p>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ margin: 0, color: getHealthColor(propScore), fontWeight: '900', fontSize: '32px', lineHeight: 1 }}>{propScore}</p>
+                <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase' }}>Health Score</p>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0' }}>
+              {[
+                { id: 'documents', label: '📄 Documents' },
+                { id: 'landlord', label: '👤 Landlord' },
+                { id: 'notes', label: `📝 Notes ${agentNotes.length > 0 ? `(${agentNotes.length})` : ''}` },
+                { id: 'templates', label: '✉️ Message' },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setAgentPropertyTab(tab.id)} style={{ padding: '10px 16px', background: 'transparent', border: 'none', borderBottom: `2px solid ${agentPropertyTab === tab.id ? blue : 'transparent'}`, color: agentPropertyTab === tab.id ? 'white' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', marginBottom: '-1px' }}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Documents tab */}
+            {agentPropertyTab === 'documents' && (
+              <div>
+                {selectedAgentPropertyDocs.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '40px', textAlign: 'center' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No documents uploaded yet</p>
+                  </div>
+                ) : selectedAgentPropertyDocs.map(doc => {
+                  const status = getExpiryStatus(doc.expiry_date);
+                  return (
+                    <div key={doc.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '16px 20px', borderRadius: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#666', flexShrink: 0 }} />
+                        <div>
+                          <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
+                          {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                          {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>No expiry date</p>}
+                        </div>
+                      </div>
+                      {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Landlord tab */}
+            {agentPropertyTab === 'landlord' && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 16px' }}>Landlord Details</p>
+                <p style={{ color: 'white', fontWeight: '700', fontSize: '15px', margin: '0 0 4px' }}>{propLandlord?.full_name || '—'}</p>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 16px' }}>{propLandlord?.email || '—'}</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: '0 0 4px' }}>Account type: <span style={{ color: 'white' }}>{propLandlord?.account_type || 'landlord'}</span></p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: 0 }}>Member since: <span style={{ color: 'white' }}>{propLandlord?.created_at ? new Date(propLandlord.created_at).toLocaleDateString('en-GB') : '—'}</span></p>
+              </div>
+            )}
+
+            {/* Notes tab */}
+            {agentPropertyTab === 'notes' && (
+              <div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  <textarea value={newAgentNote} onChange={e => setNewAgentNote(e.target.value)} placeholder="Add a note about this property..." rows={3} style={{ flex: 1, padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'none' }} />
+                  <button onClick={handleAddAgentNote} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', alignSelf: 'flex-end' }}>Add</button>
+                </div>
+                {agentNotes.length === 0 && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No notes yet</p>}
+                {agentNotes.map(note => (
+                  <div key={note.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px' }}>
+                    <p style={{ margin: '0 0 8px', color: 'white', fontSize: '14px', lineHeight: '1.6' }}>{note.note}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{new Date(note.created_at).toLocaleString('en-GB')}</p>
+                      <button onClick={() => handleDeleteAgentNote(note.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Message/Templates tab */}
+            {agentPropertyTab === 'templates' && (
+              <div>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '16px' }}>Send a message to the landlord using one of your templates.</p>
+                {agentTemplates.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 12px' }}>No templates yet — create them in the Templates section</p>
+                  </div>
+                ) : agentTemplates.map(t => (
+                  <div key={t.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px 20px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>{t.title}</p>
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>{t.body}</p>
+                    </div>
+                    <a href={`mailto:${propLandlord?.email || ''}?subject=${encodeURIComponent(t.title)}&body=${encodeURIComponent(t.body)}`} style={{ padding: '8px 16px', background: blue, color: 'white', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', textDecoration: 'none', whiteSpace: 'nowrap' }}>Send Email</a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Templates screen
+    if (agentScreen === 'templates') {
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
+              <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={() => setAgentScreen(n.id)} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: 0 }}>📝 Message Templates</h1>
+              <button onClick={() => setShowNewTemplate(!showNewTemplate)} style={{ padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>+ New Template</button>
+            </div>
+            {showNewTemplate && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '14px', padding: '24px', marginBottom: '20px' }}>
+                <input type="text" placeholder="Template title" value={templateTitle} onChange={e => setTemplateTitle(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box' }} />
+                <textarea placeholder="Message body..." value={templateBody} onChange={e => setTemplateBody(e.target.value)} rows={6} style={{ width: '100%', padding: '12px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box', resize: 'vertical' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={handleSaveTemplate} style={{ padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Save Template</button>
+                  <button onClick={() => setShowNewTemplate(false)} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {agentTemplates.length === 0 && !showNewTemplate && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '48px', textAlign: 'center' }}>
+                <p style={{ fontSize: '32px', margin: '0 0 12px' }}>✉️</p>
+                <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No templates yet</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Create reusable message templates for chasing landlords</p>
+              </div>
+            )}
+            {agentTemplates.map(t => (
+              <div key={t.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <p style={{ margin: 0, color: 'white', fontWeight: '700', fontSize: '15px' }}>{t.title}</p>
+                  <button onClick={() => handleDeleteTemplate(t.id)} style={{ padding: '3px 8px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '4px', fontSize: '11px', fontFamily: font, cursor: 'pointer' }}>Delete</button>
+                </div>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{t.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Settings screen
+    if (agentScreen === 'settings') {
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
+              <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={() => setAgentScreen(n.id)} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+          <div style={{ padding: '32px', maxWidth: '600px', margin: '0 auto' }}>
+            <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', marginBottom: '24px' }}>⚙️ Settings</h1>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', marginBottom: '16px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Agency Profile</p>
+              <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px' }}>{userRecord?.agency_name || '—'}</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 16px' }}>{user?.email}</p>
+              <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '12px 16px' }}>
+                <p style={{ margin: '0 0 4px', color: '#7db3e8', fontSize: '13px', fontWeight: '700' }}>Your Agent Code</p>
+                <p style={{ margin: 0, color: 'white', fontSize: '13px', fontFamily: 'monospace' }}>{userRecord?.agent_code}</p>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', marginBottom: '16px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Invitation Link</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 12px' }}>Share this with landlords to link them to your portfolio automatically.</p>
+              <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all', marginBottom: '10px' }}>{inviteLink}</div>
+              <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 16px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                {inviteCopied ? '✓ Copied!' : 'Copy Link'}
+              </button>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Support</p>
+              <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate@gmail.com</a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Main dashboard + properties list
     return (
       <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
-        {/* Agent Header */}
+        {/* Header with nav */}
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
-            <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Dashboard'}</span>
+            <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
           </div>
-          <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {navItems.map(n => <button key={n.id} onClick={() => { setAgentScreen(n.id); if (n.id === 'templates') { supabase.from('templates').select('*').eq('agent_id', user.id).then(({data}) => { if (data) setAgentTemplates(data); }); } }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+            <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+          </div>
         </div>
 
         <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
-          {/* Welcome */}
-          <div style={{ marginBottom: '28px' }}>
-            <h1 style={{ color: 'white', fontWeight: '900', fontSize: '26px', margin: '0 0 4px' }}>Portfolio Overview 📊</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '13px' }}>{agentProperties.length} properties · {agentLandlords.length} landlords</p>
-          </div>
+
+          {/* Work Queue — Heart Attack Dashboard */}
+          {(workQueue.expired.length > 0 || workQueue.urgent.length > 0) && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
+              <p style={{ margin: '0 0 12px', color: '#ef4444', fontWeight: '800', fontSize: '14px' }}>⚠️ Work Queue — Needs Attention Today</p>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                {workQueue.expired.length > 0 && (
+                  <div style={{ background: 'rgba(239,68,68,0.1)', borderRadius: '10px', padding: '12px 16px', flex: 1, minWidth: '160px' }}>
+                    <p style={{ margin: '0 0 4px', color: '#ef4444', fontWeight: '900', fontSize: '24px' }}>{workQueue.expired.length}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Expired certificates</p>
+                  </div>
+                )}
+                {workQueue.urgent.length > 0 && (
+                  <div style={{ background: 'rgba(249,115,22,0.1)', borderRadius: '10px', padding: '12px 16px', flex: 1, minWidth: '160px' }}>
+                    <p style={{ margin: '0 0 4px', color: '#f97316', fontWeight: '900', fontSize: '24px' }}>{workQueue.urgent.length}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Expiring within 30 days</p>
+                  </div>
+                )}
+                {workQueue.soon.length > 0 && (
+                  <div style={{ background: 'rgba(234,179,8,0.1)', borderRadius: '10px', padding: '12px 16px', flex: 1, minWidth: '160px' }}>
+                    <p style={{ margin: '0 0 4px', color: '#eab308', fontWeight: '900', fontSize: '24px' }}>{workQueue.soon.length}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Expiring within 90 days</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Stats */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
             {[
               { label: 'Properties', value: agentProperties.length, color: blue, sub: 'In your portfolio' },
-              { label: 'Action Needed', value: stats.expired + stats.urgent, color: '#ef4444', sub: 'Expired or urgent' },
-              { label: 'Expiring Soon', value: stats.soon, color: '#eab308', sub: 'Within 90 days' },
-              { label: 'Compliant', value: stats.good, color: '#22c55e', sub: 'All good' },
+              { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent' },
+              { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days' },
+              { label: 'Compliant', value: agentProperties.filter(p => getHealthScore(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+' },
+              { label: 'Landlords', value: agentLandlords.length, color: '#a78bfa', sub: 'Linked accounts' },
             ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px 24px', flex: 1, minWidth: '160px' }}>
-                <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
-                <p style={{ margin: '0 0 4px', color: s.color, fontSize: '36px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
+              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '140px' }}>
+                <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
+                <p style={{ margin: '0 0 2px', color: s.color, fontSize: '32px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{s.sub}</p>
               </div>
             ))}
           </div>
 
           {/* Invite Link */}
-          <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px' }}>
-            <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>🔗 Your Landlord Invitation Link</p>
-            <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Share this with your landlords — when they sign up via this link they're automatically linked to your portfolio.</p>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ background: 'rgba(255,255,255,0.06)', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', flex: 1, wordBreak: 'break-all' }}>{inviteLink}</div>
-              <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 16px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                {inviteCopied ? '✓ Copied!' : 'Copy Link'}
-              </button>
+          <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: '0 0 2px', color: 'white', fontWeight: '700', fontSize: '13px' }}>🔗 Landlord Invitation Link</p>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Share with landlords to link them automatically</p>
             </div>
+            <div style={{ background: 'rgba(255,255,255,0.06)', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>{inviteLink}</div>
+            <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 16px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              {inviteCopied ? '✓ Copied!' : 'Copy Link'}
+            </button>
           </div>
 
-          {/* Filter */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          {/* Search + Filter + Export */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="text" placeholder="Search properties or landlords..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} style={{ flex: 1, minWidth: '200px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
             {[
-              { id: 'all', label: 'All Properties' },
-              { id: 'red', label: '🔴 Action Needed' },
-              { id: 'amber', label: '🟡 Expiring Soon' },
-              { id: 'green', label: '🟢 Compliant' },
-              { id: 'none', label: '⚫ No Documents' },
+              { id: 'all', label: 'All' },
+              { id: 'red', label: '🔴 Action' },
+              { id: 'amber', label: '🟡 Soon' },
+              { id: 'green', label: '🟢 Good' },
+              { id: 'none', label: '⚫ No Docs' },
             ].map(f => (
-              <button key={f.id} onClick={() => setAgentFilter(f.id)} style={{ padding: '6px 14px', background: agentFilter === f.id ? blue : 'rgba(255,255,255,0.06)', color: agentFilter === f.id ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentFilter === f.id ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
-                {f.label} {f.id !== 'all' && `(${f.id === 'red' ? stats.expired + stats.urgent : f.id === 'amber' ? stats.soon : f.id === 'green' ? stats.good : agentProperties.filter(p => getPropertyHealth(p.id).type === 'none').length})`}
+              <button key={f.id} onClick={() => setAgentFilter(f.id)} style={{ padding: '6px 12px', background: agentFilter === f.id ? blue : 'rgba(255,255,255,0.06)', color: agentFilter === f.id ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentFilter === f.id ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+                {f.label}
               </button>
             ))}
+            <button onClick={handleAgentExportCSV} style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              📥 Export CSV
+            </button>
           </div>
 
           {/* Properties Table */}
@@ -1227,34 +1547,40 @@ function App() {
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '60px 24px', textAlign: 'center' }}>
               <p style={{ fontSize: '40px', margin: '0 0 12px' }}>🏠</p>
               <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No properties linked yet</p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 20px' }}>Share your invitation link with landlords to get started</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Share your invitation link with landlords to get started</p>
             </div>
           ) : (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
-              {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1.5fr 1fr', gap: '0', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
-                {['Property', 'Landlord', 'Health', 'Next Expiry', 'Days Left'].map(h => (
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
+                {['Property', 'Landlord', 'Score', 'Next Expiry', 'Status', ''].map(h => (
                   <p key={h} style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</p>
                 ))}
               </div>
-              {filteredProperties.map((property, i) => {
-                const health = getPropertyHealth(property.id);
+              {filteredAndSearched.map((property, i) => {
+                const score = getHealthScore(property.id);
+                const scoreColor = getHealthColor(score);
                 const nextExpiry = getNextExpiry(property.id);
                 const landlord = getLandlordForProperty(property);
                 const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
                 return (
-                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1.5fr 1fr', gap: '0', padding: '14px 20px', borderBottom: i < filteredProperties.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
+                  <div key={property.id} onClick={() => handleSelectAgentProperty(property)} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <div>
                       <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
                       <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
                     </div>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{landlord?.email || '—'}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: health.color, flexShrink: 0 }} />
-                      <span style={{ color: health.color, fontSize: '12px', fontWeight: '700' }}>{health.label}</span>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.email || '—'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${scoreColor}20`, border: `2px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: scoreColor, fontWeight: '900', fontSize: '11px' }}>{score}</span>
+                      </div>
                     </div>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{nextExpiry ? `${nextExpiry.document_type}` : '—'}</p>
-                    <p style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: status?.color || 'rgba(255,255,255,0.3)' }}>{status ? status.label : '—'}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{nextExpiry ? nextExpiry.document_type : '—'}</p>
+                    <div>
+                      {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
+                    </div>
+                    <p style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600' }}>View →</p>
                   </div>
                 );
               })}
