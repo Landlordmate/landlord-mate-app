@@ -649,6 +649,11 @@ function App() {
   const [templateTitle, setTemplateTitle] = useState('');
   const [templateBody, setTemplateBody] = useState('');
   const [selectedProperties, setSelectedProperties] = useState([]);
+  const [agencyLogoUrl, setAgencyLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showPrintProperty, setShowPrintProperty] = useState(false);
+  const [bulkChasing, setBulkChasing] = useState(false);
+  const [bulkChaseResult, setBulkChaseResult] = useState('');
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
 
@@ -708,6 +713,7 @@ function App() {
 
   const loadAgentData = async (agentRecord) => {
     setAgentData(agentRecord);
+    if (agentRecord.logo_url) setAgencyLogoUrl(agentRecord.logo_url);
     // Load all landlords linked to this agent
     const { data: landlords } = await supabase.from('users').select('*').eq('account_type', 'landlord');
     if (!landlords) return;
@@ -765,6 +771,49 @@ function App() {
   const handleDeleteTemplate = async (id) => {
     await supabase.from('templates').delete().eq('id', id);
     setAgentTemplates(agentTemplates.filter(t => t.id !== id));
+  };
+
+  const handleLogoUpload = async (file) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    const ext = file.name.split('.').pop();
+    const path = `logos/${user.id}.${ext}`;
+    const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('documents').getPublicUrl(path);
+      await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      setAgencyLogoUrl(data.publicUrl);
+    }
+    setUploadingLogo(false);
+  };
+
+  const handleBulkChase = async () => {
+    if (selectedProperties.length === 0) return;
+    setBulkChasing(true);
+    setBulkChaseResult('');
+    let sent = 0;
+    for (const propId of selectedProperties) {
+      const property = agentProperties.find(p => p.id === propId);
+      const landlord = agentLandlords.find(l => l.id === property?.user_id);
+      if (landlord?.email) {
+        try {
+          await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: landlord.email,
+              full_name: landlord.full_name || 'Landlord',
+              subject: `Action Required: Compliance documents needed for ${property.address_line_1}`,
+              message: `Your letting agent ${userRecord?.agency_name || ''} has flagged that compliance documents for ${property.address_line_1} need attention. Please log in to The Landlord Mate and update your certificates as soon as possible.`
+            })
+          });
+          sent++;
+        } catch(e) {}
+      }
+    }
+    setBulkChaseResult(`✓ Reminder sent to ${sent} landlord${sent !== 1 ? 's' : ''}`);
+    setSelectedProperties([]);
+    setBulkChasing(false);
   };
 
   const handleAgentExportCSV = () => {
@@ -1253,9 +1302,14 @@ function App() {
                 <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: '0 0 4px' }}>{selectedAgentProperty.address_line_1}</h1>
                 <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '13px', textTransform: 'capitalize' }}>{selectedAgentProperty.property_type}{selectedAgentProperty.country ? ` · ${selectedAgentProperty.country}` : ''}</p>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ margin: 0, color: getHealthColor(propScore), fontWeight: '900', fontSize: '32px', lineHeight: 1 }}>{propScore}</p>
-                <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase' }}>Health Score</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => { const w = window.open('', '_blank'); const today = new Date().toLocaleDateString('en-GB'); w.document.write(`<html><head><title>Compliance Report - ${selectedAgentProperty.address_line_1}</title><style>body{font-family:Georgia,serif;padding:40px;max-width:800px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px;border-bottom:2px solid #0f1e30;padding-bottom:6px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#0f1e30;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}.green{color:#22c55e;font-weight:700}.red{color:#ef4444;font-weight:700}.amber{color:#eab308;font-weight:700}.footer{margin-top:40px;font-size:11px;color:#999;border-top:1px solid #e2e8f0;padding-top:12px}</style></head><body><h1>${selectedAgentProperty.address_line_1}</h1><p style="color:#666;font-size:13px">${selectedAgentProperty.property_type}${selectedAgentProperty.country ? ' · ' + selectedAgentProperty.country : ''} · Report generated ${today}</p><p style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 14px;border-radius:6px;font-size:13px">Compliance Health Score: <strong style="color:${propScore >= 80 ? '#22c55e' : propScore >= 50 ? '#eab308' : '#ef4444'}">${propScore}/100</strong></p><h2>Compliance Documents</h2><table><tr><th>Document</th><th>Expiry Date</th><th>Status</th><th>Days Remaining</th></tr>${selectedAgentPropertyDocs.map(doc => { const s = getExpiryStatus(doc.expiry_date); const cls = s?.type === 'good' ? 'green' : s?.type === 'expired' ? 'red' : 'amber'; return `<tr><td>${doc.document_type}</td><td>${doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-GB') : 'No date'}</td><td class="${cls}">${s?.label || 'No date set'}</td><td class="${cls}">${s?.label || '—'}</td></tr>`; }).join('')}</table><div class="footer">Generated by The Landlord Mate for ${userRecord?.agency_name || 'your agency'} · thelandlordmate.com · ${today}</div></body></html>`); w.print(); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                  🖨️ Compliance Report
+                </button>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ margin: 0, color: getHealthColor(propScore), fontWeight: '900', fontSize: '32px', lineHeight: 1 }}>{propScore}</p>
+                  <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase' }}>Health Score</p>
+                </div>
               </div>
             </div>
 
@@ -1426,6 +1480,13 @@ function App() {
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Agency Profile</p>
               <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px' }}>{userRecord?.agency_name || '—'}</p>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 16px' }}>{user?.email}</p>
+              
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }} />
+                {uploadingLogo && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Uploading...</span>}
+              </div>
               <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '12px 16px' }}>
                 <p style={{ margin: '0 0 4px', color: '#7db3e8', fontSize: '13px', fontWeight: '700' }}>Your Agent Code</p>
                 <p style={{ margin: 0, color: 'white', fontSize: '13px', fontFamily: 'monospace' }}>{userRecord?.agent_code}</p>
@@ -1455,6 +1516,7 @@ function App() {
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={logo} alt="The Landlord Mate" style={{ height: '36px' }} />
+            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '32px', objectFit: 'contain', borderRadius: '4px' }} />}
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -1501,11 +1563,12 @@ function App() {
               { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent' },
               { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days' },
               { label: 'Compliant', value: agentProperties.filter(p => getHealthScore(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+' },
-              { label: 'Landlords', value: agentLandlords.length, color: '#a78bfa', sub: 'Linked accounts' },
+              { label: 'Compliance %', value: agentProperties.length > 0 ? `${Math.round((agentProperties.filter(p => getHealthScore(p.id) >= 80).length / agentProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health' },
+              { label: 'Landlords', value: agentLandlords.length, color: '#4a9eff', sub: 'Linked accounts' },
             ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '140px' }}>
+              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px' }}>
                 <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
-                <p style={{ margin: '0 0 2px', color: s.color, fontSize: '32px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
+                <p style={{ margin: '0 0 2px', color: s.color, fontSize: '28px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{s.sub}</p>
               </div>
             ))}
@@ -1540,7 +1603,13 @@ function App() {
             <button onClick={handleAgentExportCSV} style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               📥 Export CSV
             </button>
+            {selectedProperties.length > 0 && (
+              <button onClick={handleBulkChase} disabled={bulkChasing} style={{ padding: '6px 14px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {bulkChasing ? 'Sending...' : `📧 Chase ${selectedProperties.length} Landlord${selectedProperties.length !== 1 ? 's' : ''}`}
+              </button>
+            )}
           </div>
+          {bulkChaseResult && <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>{bulkChaseResult}</p>}
 
           {/* Properties Table */}
           {agentProperties.length === 0 ? (
@@ -1551,8 +1620,8 @@ function App() {
             </div>
           ) : (
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
-                {['Property', 'Landlord', 'Score', 'Next Expiry', 'Status', ''].map(h => (
+              <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
+                {['', 'Property', 'Landlord', 'Score', 'Next Expiry', 'Status', ''].map(h => (
                   <p key={h} style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</p>
                 ))}
               </div>
@@ -1563,9 +1632,10 @@ function App() {
                 const landlord = getLandlordForProperty(property);
                 const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
                 return (
-                  <div key={property.id} onClick={() => handleSelectAgentProperty(property)} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
+                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <input type="checkbox" checked={selectedProperties.includes(property.id)} onChange={(e) => { e.stopPropagation(); setSelectedProperties(prev => e.target.checked ? [...prev, property.id] : prev.filter(id => id !== property.id)); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
                     <div>
                       <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
                       <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
@@ -1580,7 +1650,7 @@ function App() {
                     <div>
                       {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
                     </div>
-                    <p style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600' }}>View →</p>
+                    <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
                   </div>
                 );
               })}
