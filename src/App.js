@@ -598,6 +598,7 @@ function App() {
   const [letterRent, setLetterRent] = useState('');
   const [letterNewRent, setLetterNewRent] = useState('');
   const [letterEffectiveDate, setLetterEffectiveDate] = useState('');
+  const [editableLetter, setEditableLetter] = useState('');
   const [editExpiry, setEditExpiry] = useState('');
   const [editDocType, setEditDocType] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -1515,7 +1516,7 @@ function App() {
             </div>
           ) : (
             <div>
-              <button onClick={() => setSelectedLetter(null)} style={{ color: 'rgba(255,255,255,0.6)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', fontFamily: font, marginBottom: '20px', padding: 0 }}>← Back to templates</button>
+              <button onClick={() => { setSelectedLetter(null); setEditableLetter(''); }} style={{ color: 'rgba(255,255,255,0.6)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', fontFamily: font, marginBottom: '20px', padding: 0 }}>← Back to templates</button>
               <h2 style={{ color: 'white', fontWeight: '800', fontSize: '16px', marginBottom: '16px' }}>{templates.find(t => t.id === selectedLetter)?.title}</h2>
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
@@ -1537,13 +1538,20 @@ function App() {
               </div>
 
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '20px', marginBottom: '16px' }}>
-                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '700', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Your letter</p>
-                <pre style={{ color: 'white', fontSize: '13px', lineHeight: '1.8', whiteSpace: 'pre-wrap', fontFamily: 'Georgia, serif', margin: 0 }}>{generateLetter(selectedLetter)}</pre>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '700', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Your letter — edit as needed</p>
+                <textarea
+                  value={editableLetter || generateLetter(selectedLetter)}
+                  onChange={(e) => setEditableLetter(e.target.value)}
+                  rows={20}
+                  style={{ width: '100%', padding: '16px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'Georgia, serif', lineHeight: '1.8', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical' }}
+                />
               </div>
 
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => { navigator.clipboard.writeText(generateLetter(selectedLetter)); }} style={{ ...primaryBtn, flex: 1 }}>📋 Copy Letter</button>
-                <button onClick={() => { const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${generateLetter(selectedLetter)}</pre></body></html>`); w.print(); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🖨️ Print</button>
+                <button onClick={() => { navigator.clipboard.writeText(editableLetter || generateLetter(selectedLetter)); }} style={{ ...primaryBtn, flex: 1 }}>📋 Copy Letter</button>
+                <button onClick={() => { const txt = editableLetter || generateLetter(selectedLetter); const w = window.open('', '_blank'); w.document.write(`<html><body style="font-family:Georgia,serif;padding:40px;max-width:700px;margin:0 auto;line-height:1.8"><pre style="white-space:pre-wrap;font-family:Georgia,serif">${txt}</pre></body></html>`); w.print(); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🖨️ Print</button>
+                <button onClick={() => setEditableLetter('')} style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>↩ Reset</button>
+              </div>
               </div>
             </div>
           )}
