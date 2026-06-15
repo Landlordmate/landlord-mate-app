@@ -122,108 +122,6 @@ function isAndroid() {
   return /android/i.test(navigator.userAgent);
 }
 
-function CompliancePieChart({ documents }) {
-  const expired = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
-  const urgent = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
-  const soon = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').length;
-  const good = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good').length;
-  const noExpiry = documents.filter(d => !d.expiry_date).length;
-  const total = documents.length;
-  if (total === 0) return null;
-  const size = 120, cx = 60, cy = 60, r = 44, innerR = 26;
-  const segments = [
-    { count: good, color: '#22c55e', label: 'Compliant' },
-    { count: soon, color: '#eab308', label: 'Expiring Soon' },
-    { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
-    { count: noExpiry, color: '#4a9eff', label: 'No Expiry' },
-  ].filter(s => s.count > 0);
-  let startAngle = -Math.PI / 2;
-  const paths = segments.map(seg => {
-    const angle = (seg.count / total) * 2 * Math.PI;
-    const endAngle = startAngle + angle;
-    const x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle), y2 = cy + r * Math.sin(endAngle);
-    const ix1 = cx + innerR * Math.cos(endAngle), iy1 = cy + innerR * Math.sin(endAngle);
-    const ix2 = cx + innerR * Math.cos(startAngle), iy2 = cy + innerR * Math.sin(startAngle);
-    const largeArc = angle > Math.PI ? 1 : 0;
-    const d = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`;
-    startAngle = endAngle;
-    return { ...seg, d };
-  });
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
-      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', margin: '0 0 16px' }}>Compliance Overview</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-          {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} opacity="0.9" />)}
-          <circle cx={cx} cy={cy} r={innerR - 2} fill="#0f1e30" />
-          <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="14" fontWeight="900" fontFamily="Nunito, sans-serif">{total}</text>
-          <text x={cx} y={cy + 10} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="8" fontFamily="Nunito, sans-serif">DOCS</text>
-        </svg>
-        <div style={{ flex: 1, minWidth: '140px' }}>
-          {[
-            { count: good, color: '#22c55e', label: 'Compliant' },
-            { count: soon, color: '#eab308', label: 'Expiring Soon' },
-            { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
-            { count: noExpiry, color: '#4a9eff', label: 'No Expiry Set' },
-          ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', flex: 1 }}>{item.label}</span>
-              <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>{item.count}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OnboardingWizard({ onComplete, onAddProperty }) {
-  const [step, setStep] = useState(1);
-  const isMobile = useIsMobile();
-  const steps = [
-    { icon: '🏠', title: 'Add your first property', desc: "Start by adding a rental property. We'll look up the address from your postcode.", action: 'Add Property →', isAdd: true, hint: null },
-    { icon: '📄', title: 'Upload a compliance document', desc: "Upload your Gas Safety Certificate, EICR, EPC or any other certificate. Set the expiry date and we'll remind you automatically.", hint: 'We send reminders at 90, 60, 30, 14 and 7 days before expiry.', action: 'Got it →', isAdd: false },
-    { icon: '🔗', title: 'Share with your agent', desc: 'Generate a secure link to share your compliance documents with your letting agent instantly — no login required for them.', action: "Let's go! →", isAdd: false, hint: null },
-  ];
-  const current = steps[step - 1];
-  return (
-    <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1 }}>
-      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 8px' }}>Welcome! Let's get you set up 👋</h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>3 quick steps and you're protected</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
-          {[1, 2, 3].map(s => (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: s < step ? '#22c55e' : s === step ? '#2b7cd3' : 'rgba(255,255,255,0.1)', border: `2px solid ${s < step ? '#22c55e' : s === step ? '#2b7cd3' : 'rgba(255,255,255,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '13px', fontWeight: '800' }}>
-                {s < step ? '✓' : s}
-              </div>
-              {s < 3 && <div style={{ width: '40px', height: '2px', background: s < step ? '#22c55e' : 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />}
-            </div>
-          ))}
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', textAlign: 'center', marginBottom: '16px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>{current.icon}</div>
-          <h2 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 12px' }}>Step {step}: {current.title}</h2>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', lineHeight: '1.7', margin: '0 0 24px' }}>{current.desc}</p>
-          {current.hint && (
-            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '10px 16px', marginBottom: '24px' }}>
-              <p style={{ color: '#7db3e8', fontSize: '13px', margin: 0 }}>💡 {current.hint}</p>
-            </div>
-          )}
-          <button onClick={() => { if (current.isAdd) { onAddProperty(); } else if (step < 3) { setStep(step + 1); } else { onComplete(); } }} style={{ width: '100%', padding: '14px', background: '#2b7cd3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
-            {current.action}
-          </button>
-        </div>
-        {step < 3 && <p onClick={() => step < 3 ? setStep(step + 1) : onComplete()} style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '13px', cursor: 'pointer', margin: 0 }}>Skip for now</p>}
-      </div>
-    </div>
-  );
-}
-
 function HomeScreenBanner({ onDismiss }) {
   const ios = isIOS();
   const android = isAndroid();
@@ -264,7 +162,10 @@ function PaywallScreen({ user, onSubscribe, subscribing }) {
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
           <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: 0 }}>Choose a plan to keep managing your compliance documents</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 12px' }}>Choose a plan to keep managing your compliance documents</p>
+          <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '8px' }}>
+            <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>🔒 Your documents are safe — subscribe any time to keep access to everything you've uploaded.</p>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
@@ -373,7 +274,7 @@ function BottomNav({ activeScreen, setScreen }) {
   return (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d1b2a', borderTop: '1px solid rgba(43,124,211,0.2)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {items.map(item => (
-        <div key={item.id} onClick={() => setScreen(item.id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', cursor: 'pointer', color: activeScreen === item.id ? blue : 'rgba(255,255,255,0.35)', fontSize: '10px', fontWeight: '700', gap: '4px' }}>
+        <div key={item.id} onClick={() => setScreen(item.id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', cursor: 'pointer', color: activeScreen === item.id ? blue : 'rgba(255,255,255,0.6)', fontSize: '10px', fontWeight: '700', gap: '4px' }}>
           <span style={{ fontSize: '20px' }}>{item.icon}</span>
           {item.label}
         </div>
@@ -389,7 +290,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
   }).length;
 
   const navItem = (id, icon, label, badge) => (
-    <div onClick={() => setScreen(id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.45)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
+    <div onClick={() => setScreen(id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
       <span style={{ fontSize: '16px' }}>{icon}</span>
       {label}
       {badge > 0 && <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{badge}</span>}
@@ -402,13 +303,13 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
       </div>
       <div style={{ padding: '16px 0', flex: 1 }}>
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
+        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
         {navItem('dashboard', '📊', 'Dashboard', urgentCount)}
         {navItem('properties', '🏠', 'All Properties')}
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
+        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
         {navItem('landlordocs', '🪪', 'My Documents')}
         {navItem('wales', '🏴󠁧󠁢󠁷󠁬󠁳󠁥', 'Wales Compliance')}
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
+        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
         {navItem('settings', '⚙️', 'Settings')}
       </div>
       <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
@@ -418,7 +319,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
           </div>
           <div style={{ overflow: 'hidden' }}>
             <p style={{ margin: 0, color: 'white', fontSize: '12px', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'}</p>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'}</p>
           </div>
         </div>
         <button onClick={handleSignOut} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>Sign Out</button>
@@ -437,9 +338,9 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
 
   const statCard = (label, value, color, sub) => (
     <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: isMobile ? '16px' : '20px 24px', flex: 1, minWidth: isMobile ? '140px' : 'auto' }}>
-      <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</p>
+      <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.65)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</p>
       <p style={{ margin: '0 0 4px', color: color, fontSize: isMobile ? '28px' : '36px', fontWeight: '900', lineHeight: 1 }}>{value}</p>
-      <p style={{ margin: 0, color: 'rgba(255,255,255,0.3)', fontSize: '11px' }}>{sub}</p>
+      <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{sub}</p>
     </div>
   );
 
@@ -450,7 +351,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#666', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, color: 'white', fontSize: '14px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.document_type}</p>
-          <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property?.address_line_1} · {doc.expiry_date ? `Due ${new Date(doc.expiry_date).toLocaleDateString('en-GB')}` : 'No expiry set'}</p>
+          <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property?.address_line_1} · {doc.expiry_date ? `Due ${new Date(doc.expiry_date).toLocaleDateString('en-GB')}` : 'No expiry set'}</p>
         </div>
         {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{status.label}</span>}
       </div>
@@ -463,7 +364,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
     <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1, overflowY: 'auto' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 4px' }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
-        <p style={{ color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: '13px' }}>
+        <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '13px' }}>
           {actionNeeded.length > 0 ? `${actionNeeded.length} ${actionNeeded.length === 1 ? 'document needs' : 'documents need'} your attention` : 'All your documents are in order ✓'}
         </p>
       </div>
@@ -477,8 +378,6 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
         {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days')}
         {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent')}
       </div>
-
-      {documents.length > 0 && <CompliancePieChart documents={documents} />}
 
       {actionNeeded.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
@@ -591,7 +490,6 @@ function App() {
   const [isRecovery, setIsRecovery] = useState(false);
   const [passwordResetDone, setPasswordResetDone] = useState(false);
   const [showHomeBanner, setShowHomeBanner] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const captchaRef = useRef(null);
   const isMobile = useIsMobile();
@@ -676,9 +574,6 @@ function App() {
     if (props) {
       setProperties(props);
       await loadAllDocuments(props);
-      if (props.length === 0 && !localStorage.getItem('tlm_onboarding_done')) {
-        setShowOnboarding(true);
-      }
     }
     const { data: ldocs } = await supabase.from('documents').select('*').eq('user_id', userId).is('property_id', null);
     if (ldocs) setLandlordDocs(ldocs);
@@ -759,7 +654,6 @@ function App() {
       if (data.session?.user) {
         setUser(data.session.user);
         await loadUserRecord(data.session.user.id);
-        setShowOnboarding(true);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -792,7 +686,7 @@ function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login'); setShowOnboarding(false);
+    setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login');
   };
 
   const handleSaveProperty = async () => {
@@ -949,22 +843,11 @@ function App() {
     return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
   }
 
-  if (user && showOnboarding) {
-    return (
-      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
-        <OnboardingWizard
-          onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
-          onAddProperty={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
-        />
-      </AppShell>
-    );
-  }
-
   if (user && screen === 'property' && selectedProperty) {
     return (
       <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
-          <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
+          <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
             <h1 style={{ color: 'white', fontWeight: '800', marginTop: '4px', fontSize: '20px', margin: 0 }}>{selectedProperty.address_line_1}</h1>
             {(() => { const score = getComplianceScore(documents); const sc = getScoreColor(score); return (
@@ -974,7 +857,7 @@ function App() {
               </div>
             ); })()}
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.4)', marginTop: '4px', textTransform: 'capitalize', fontSize: '13px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '4px', textTransform: 'capitalize', fontSize: '13px' }}>
             {selectedProperty.property_type}{selectedProperty.country ? ` · ${getCountryFlag(selectedProperty.country)} ${selectedProperty.country}` : ''}
           </p>
 
@@ -1024,7 +907,7 @@ function App() {
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#555', flexShrink: 0, marginTop: '5px' }} />
                     <div style={{ minWidth: 0 }}>
                       <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
-                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
                       {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: '#eab308', fontSize: '12px' }}>⚠ No expiry date set</p>}
                       {doc.document_type === 'Deposit Certificate' && (
                         <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1052,6 +935,7 @@ function App() {
               <select value={docType} onChange={(e) => { setDocType(e.target.value); setCustomDocType(''); }} style={inputStyle}>
                 {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '-8px', marginBottom: '12px' }}>💡 Can't find your document? Select 'Other' to add your own.</p>
               {docType === 'Other' && (
                 <input type="text" placeholder="Enter document type…" value={customDocType} onChange={(e) => setCustomDocType(e.target.value)} style={{ ...inputStyle, marginTop: '-4px' }} />
               )}
@@ -1122,7 +1006,7 @@ function App() {
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
-                  <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px', textTransform: 'capitalize' }}>
+                  <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'capitalize' }}>
                     {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>Manage Documents →</span>
                   </p>
                 </div>
@@ -1205,7 +1089,7 @@ function App() {
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: status?.color || '#2b7cd3', flexShrink: 0, marginTop: '5px' }} />
                     <div style={{ minWidth: 0 }}>
                       <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
-                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
+                      {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
                       {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>No expiry date</p>}
                     </div>
                   </div>
@@ -1248,7 +1132,7 @@ function App() {
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🏴󠁧󠁢󠁷󠁬󠁳󠁥 Wales Compliance Centre</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Everything you need under the Renting Homes (Wales) Act 2016.</p>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>QUICK LINKS</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>QUICK LINKS</p>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '28px' }}>
             {[
               { label: 'Rent Smart Wales', url: 'https://rentsmart.gov.wales' },
@@ -1264,7 +1148,7 @@ function App() {
             ))}
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>NRLA TEMPLATES & RESOURCES</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>NRLA TEMPLATES & RESOURCES</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '18px 20px', borderRadius: '12px', marginBottom: '28px' }}>
             <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>Free landlord templates from the NRLA</p>
             <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.45)', fontSize: '13px', lineHeight: '1.6' }}>Tenancy agreements, notice templates, inventory forms, rent increase notices and more — all free to NRLA members.</p>
@@ -1275,7 +1159,7 @@ function App() {
             </div>
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>COMPLIANCE REQUIREMENTS</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '12px' }}>COMPLIANCE REQUIREMENTS</p>
           {[
             { title: 'Rent Smart Wales Licence', desc: 'All landlords in Wales must be registered and licensed with Rent Smart Wales. Renewals every 5 years.', link: 'https://rentsmart.gov.wales', urgent: true },
             { title: 'Gas Safety Certificate', desc: 'Annual inspection by a Gas Safe registered engineer. Must be provided to tenants within 28 days.', urgent: false },
@@ -1339,7 +1223,7 @@ function App() {
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>Settings</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Manage your account and preferences.</p>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '10px' }}>ACCOUNT</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', marginBottom: '10px' }}>ACCOUNT</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Email address</p>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>{user?.email}</p>
@@ -1367,7 +1251,7 @@ function App() {
             <button onClick={handleChangePassword} style={{ width: '100%', padding: '12px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Update Password</button>
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUBSCRIPTION</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUBSCRIPTION</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -1383,21 +1267,21 @@ function App() {
             )}
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Email Reminders</p>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Automatic reminders at 90, 60, 30, 14 and 7 days before any document expires.</p>
             <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>✓ Active</span>
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUPPORT</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUPPORT</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Need help?</p>
             <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>thelandlordmate@gmail.com</a>
             <a href="https://thelandlordmate.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate.com →</a>
           </div>
 
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>DANGER ZONE</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>DANGER ZONE</p>
           <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Delete Account</p>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 14px' }}>Permanently delete your account and all your data. This cannot be undone.</p>
