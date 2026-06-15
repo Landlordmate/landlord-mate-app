@@ -1680,7 +1680,6 @@ function App() {
             <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '800', fontSize: '16px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
-            <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
