@@ -406,6 +406,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
     <div style={{ width: '220px', minHeight: '100vh', background: '#0d1b2a', borderRight: '1px solid rgba(43,124,211,0.15)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(43,124,211,0.15)', cursor: 'pointer' }} onClick={() => setScreen('dashboard')}>
         <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
+        {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '36px', objectFit: 'contain', marginTop: '8px', display: 'block', borderRadius: '4px' }} />}
       </div>
       <div style={{ padding: '16px 0', flex: 1 }}>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
@@ -693,6 +694,9 @@ function App() {
   const [agencyLogoUrl, setAgencyLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoSaved, setLogoSaved] = useState(false);
+  const [landlordLogoUrl, setLandlordLogoUrl] = useState('');
+  const [landlordLogoSaved, setLandlordLogoSaved] = useState(false);
+  const [propertyPhotoUrl, setPropertyPhotoUrl] = useState('');
   const [showPrintProperty, setShowPrintProperty] = useState(false);
   const [bulkChasing, setBulkChasing] = useState(false);
   const [bulkChaseResult, setBulkChaseResult] = useState('');
@@ -761,6 +765,7 @@ function App() {
     const { data } = await supabase.from('users').select('*').eq('id', userId).single();
     if (data) {
       setUserRecord(data);
+      if (data.logo_url) setLandlordLogoUrl(data.logo_url);
       if (data.account_type === 'agent') {
         loadAgentData(data);
       }
@@ -862,7 +867,31 @@ function App() {
     setUploadingLogo(false);
   };
 
-  const handleInviteLandlord = async () => {
+  const handleLandlordLogoUpload = async (file) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = `landlord_${user.id}.${ext}`;
+    const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('logos').getPublicUrl(path);
+      await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      setLandlordLogoUrl(data.publicUrl);
+      setLandlordLogoSaved(true);
+      setTimeout(() => setLandlordLogoSaved(false), 3000);
+    }
+  };
+
+  const handlePropertyPhotoUpload = async (file, propertyId) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = `property_${propertyId}.${ext}`;
+    const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('logos').getPublicUrl(path);
+      await supabase.from('properties').update({ photo_url: data.publicUrl }).eq('id', propertyId);
+      setProperties(properties.map(p => p.id === propertyId ? { ...p, photo_url: data.publicUrl } : p));
+    }
+  };
     if (!inviteLandlordEmail.trim()) return;
     setInviteSending(true);
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
@@ -2056,7 +2085,22 @@ function App() {
       <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
+          
+          {/* Property photo */}
+          {selectedProperty.photo_url ? (
+            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', height: '180px' }}>
+              <img src={selectedProperty.photo_url} alt={selectedProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <label style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                📷 Change Photo
+                <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
+              </label>
+            </div>
+          ) : (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+              📷 Add a photo of this property
+              <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
+            </label>
+          )}
             <h1 style={{ color: 'white', fontWeight: '800', marginTop: '4px', fontSize: '20px', margin: 0 }}>{selectedProperty.address_line_1}</h1>
             {(() => { const score = getComplianceScore(documents); const sc = getScoreColor(score); return (
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -2404,19 +2448,22 @@ function App() {
           )}
 
           {properties.map(p => (
-            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '16px 20px', borderRadius: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
-                  <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'capitalize' }}>
-                    {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>Manage Documents →</span>
-                  </p>
+            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', marginBottom: '12px', cursor: 'pointer', overflow: 'hidden' }}>
+              {p.photo_url && <div style={{ height: '140px', overflow: 'hidden' }}><img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+              <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                  {!p.photo_url && <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>}
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
+                    <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'capitalize' }}>
+                      {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>Manage Documents →</span>
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
-                <button onClick={(e) => handleEditProperty(p, e)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
-                <button onClick={(e) => handleDeleteProperty(p.id, e)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                  <button onClick={(e) => handleEditProperty(p, e)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                  <button onClick={(e) => handleDeleteProperty(p.id, e)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                </div>
               </div>
             </div>
           ))}
@@ -2789,6 +2836,15 @@ function App() {
             {settingsPasswordError && <p style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>⚠ {settingsPasswordError}</p>}
             <input type="password" placeholder="New password (min 8 characters)" value={settingsNewPassword} onChange={(e) => setSettingsNewPassword(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
             <button onClick={handleChangePassword} style={{ width: '100%', padding: '12px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Update Password</button>
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>BRANDING</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Your Logo</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Upload your company logo — shows in your dashboard header.</p>
+            {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px' }} />}
+            <input type="file" accept="image/*" onChange={e => handleLandlordLogoUpload(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }} />
+            {landlordLogoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>✓ Logo saved!</p>}
           </div>
 
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUBSCRIPTION</p>
