@@ -841,6 +841,8 @@ function App() {
     } catch(e) {}
     setInviteSending(false);
   };
+
+  const handleBulkChase = async () => {
     if (selectedProperties.length === 0) return;
     setBulkChasing(true);
     setBulkChaseResult('');
