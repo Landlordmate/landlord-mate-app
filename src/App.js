@@ -600,6 +600,8 @@ function App() {
   const [tenantName, setTenantName] = useState('');
   const [tenantPhone, setTenantPhone] = useState('');
   const [tenancySaved, setTenancySaved] = useState(false);
+  const [rentReviewDate, setRentReviewDate] = useState('');
+  const [purchasePrice, setPurchasePrice] = useState('');
   const [showPrintReport, setShowPrintReport] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [letterProperty, setLetterProperty] = useState('');
@@ -1082,6 +1084,8 @@ function App() {
     setTenancyEnd(property.tenancy_end || '');
     setTenantName(property.tenant_name || '');
     setTenantPhone(property.tenant_phone || '');
+    setRentReviewDate(property.rent_review_date || '');
+    setPurchasePrice(property.purchase_price || '');
     setShowAddExpense(false);
     const { data } = await supabase.from('documents').select('*').eq('property_id', property.id);
     if (data) setDocuments(data);
@@ -1171,7 +1175,13 @@ function App() {
   };
 
   const handleSaveTenancy = async () => {
-    const { error } = await supabase.from('properties').update({ tenancy_start: tenancyStart || null, tenancy_end: tenancyEnd || null, tenant_name: tenantName, tenant_phone: tenantPhone }).eq('id', selectedProperty.id);
+    const { error } = await supabase.from('properties').update({ 
+      tenancy_start: tenancyStart || null, 
+      tenancy_end: tenancyEnd || null, 
+      tenant_name: tenantName, 
+      tenant_phone: tenantPhone,
+      rent_review_date: rentReviewDate || null,
+    }).eq('id', selectedProperty.id);
     if (!error) { setTenancySaved(true); setTimeout(() => setTenancySaved(false), 3000); }
   };
 
@@ -1977,6 +1987,34 @@ function App() {
               </div>
             </div>
             <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>Log costs for tax returns — repairs, certificates, maintenance etc.</p>
+
+            {/* Purchase Price */}
+            <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.2)', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '13px' }}>🏠 Purchase Price</p>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>£</span>
+                  <input type="number" placeholder="0.00" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} style={{ ...inputStyle, marginBottom: 0, paddingLeft: '28px' }} />
+                </div>
+                <button onClick={async () => { await supabase.from('properties').update({ purchase_price: purchasePrice || null }).eq('id', selectedProperty.id); }} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Save</button>
+              </div>
+              {purchasePrice && expenses.length > 0 && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Purchase price</span>
+                    <span style={{ color: 'white', fontSize: '12px', fontWeight: '600' }}>£{parseFloat(purchasePrice).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Total expenses</span>
+                    <span style={{ color: 'white', fontSize: '12px', fontWeight: '600' }}>£{expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span style={{ color: 'white', fontSize: '13px', fontWeight: '700' }}>Total invested</span>
+                    <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: '900' }}>£{(parseFloat(purchasePrice) + expenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
             {showAddExpense && (
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', padding: '16px', marginBottom: '12px' }}>
                 <select value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }}>
@@ -2040,6 +2078,15 @@ function App() {
             })()}
             <input type="text" placeholder="Tenant name" value={tenantName} onChange={(e) => setTenantName(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
             <input type="text" placeholder="Tenant phone" value={tenantPhone} onChange={(e) => setTenantPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+            <div>
+              <label style={{ display: 'block', marginBottom: '4px', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: '600' }}>Next Rent Review Date</label>
+              <input type="date" value={rentReviewDate} onChange={(e) => setRentReviewDate(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+              {rentReviewDate && (() => {
+                const days = Math.ceil((new Date(rentReviewDate) - new Date()) / (1000 * 60 * 60 * 24));
+                const color = days < 30 ? '#ef4444' : days < 90 ? '#eab308' : '#22c55e';
+                return <p style={{ color, fontSize: '12px', fontWeight: '600', margin: '-4px 0 8px' }}>📅 Rent review {days < 0 ? 'was overdue' : `in ${days} days`} ({new Date(rentReviewDate).toLocaleDateString('en-GB')})</p>;
+              })()}
+            </div>
             <button onClick={handleSaveTenancy} style={{ padding: '8px 20px', background: tenancySaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               {tenancySaved ? '✓ Saved!' : 'Save Tenancy Details'}
             </button>
