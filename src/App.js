@@ -388,7 +388,7 @@ function BottomNav({ activeScreen, setScreen }) {
   );
 }
 
-function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, documents }) {
+function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, documents, landlordLogoUrl }) {
   const urgentCount = documents.filter(d => {
     const s = getExpiryStatus(d.expiry_date);
     return s?.type === 'expired' || s?.type === 'urgent';
@@ -555,7 +555,7 @@ function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocum
   const isMobile = useIsMobile();
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
-      {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} />}
+      {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} landlordLogoUrl={landlordLogoUrl} />}
       {isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
           <img src={logo} alt="The Landlord Mate" style={{ height: '36px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
