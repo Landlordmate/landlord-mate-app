@@ -892,6 +892,8 @@ function App() {
       setProperties(properties.map(p => p.id === propertyId ? { ...p, photo_url: data.publicUrl } : p));
     }
   };
+
+  const handleInviteLandlord = async () => {
     if (!inviteLandlordEmail.trim()) return;
     setInviteSending(true);
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
@@ -2101,6 +2103,7 @@ function App() {
               <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
             </label>
           )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
             <h1 style={{ color: 'white', fontWeight: '800', marginTop: '4px', fontSize: '20px', margin: 0 }}>{selectedProperty.address_line_1}</h1>
             {(() => { const score = getComplianceScore(documents); const sc = getScoreColor(score); return (
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
