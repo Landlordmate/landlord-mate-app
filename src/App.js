@@ -647,6 +647,12 @@ function App() {
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteLandlordEmail, setInviteLandlordEmail] = useState('');
+  const [inviteLandlordName, setInviteLandlordName] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteSent, setInviteSent] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [agentDemoMode, setAgentDemoMode] = useState(false);
   const [agentSearch, setAgentSearch] = useState('');
   const [agentScreen, setAgentScreen] = useState('dashboard');
   const [selectedAgentProperty, setSelectedAgentProperty] = useState(null);
@@ -813,7 +819,28 @@ function App() {
     setUploadingLogo(false);
   };
 
-  const handleBulkChase = async () => {
+  const handleInviteLandlord = async () => {
+    if (!inviteLandlordEmail.trim()) return;
+    setInviteSending(true);
+    const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
+    try {
+      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteLandlordEmail.trim(),
+          full_name: inviteLandlordName.trim() || 'Landlord',
+          subject: `${userRecord?.agency_name || 'Your letting agent'} has invited you to The Landlord Mate`,
+          message: `Dear ${inviteLandlordName.trim() || 'Landlord'},\n\n${userRecord?.agency_name || 'Your letting agent'} has invited you to join The Landlord Mate — a simple platform to store your compliance documents and share them with your agent automatically.\n\nClick the link below to create your free account:\n\n${inviteLink}\n\nOnce you sign up, your documents will automatically be visible to ${userRecord?.agency_name || 'your agent'} — no more chasing or emailing certificates.\n\nThe Landlord Mate Team\nthelandlordmate.com`
+        })
+      });
+      setInviteSent(true);
+      setInviteLandlordEmail('');
+      setInviteLandlordName('');
+      setTimeout(() => { setInviteSent(false); setShowInviteForm(false); }, 3000);
+    } catch(e) {}
+    setInviteSending(false);
+  };
     if (selectedProperties.length === 0) return;
     setBulkChasing(true);
     setBulkChaseResult('');
@@ -1316,6 +1343,39 @@ function App() {
     const agentIsSubscribed = userRecord?.subscription_status === 'active';
     const agentTrialExpired = agentTrialStatus.expired && !agentIsSubscribed;
 
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 3);
+    const in28 = new Date(); in28.setDate(in28.getDate() + 28);
+    const in75 = new Date(); in75.setDate(in75.getDate() + 75);
+    const in200 = new Date(); in200.setDate(in200.getDate() + 200);
+
+    const demoProperties = [
+      { id: 'demo1', address_line_1: '14 Maple Street, Cardiff, CF10 2AB', property_type: 'house', country: 'Wales', user_id: 'demo_landlord1' },
+      { id: 'demo2', address_line_1: '29 Pantbach Road, Birchgrove, CF14 1TH', property_type: 'house', country: 'Wales', user_id: 'demo_landlord2' },
+      { id: 'demo3', address_line_1: '7 Cyncoed Avenue, Cardiff, CF23 6SB', property_type: 'flat', country: 'Wales', user_id: 'demo_landlord3' },
+      { id: 'demo4', address_line_1: '42 Whitchurch Road, Cardiff, CF14 3LX', property_type: 'house', country: 'Wales', user_id: 'demo_landlord4' },
+      { id: 'demo5', address_line_1: '15 Cathedral Road, Cardiff, CF11 9HA', property_type: 'flat', country: 'Wales', user_id: 'demo_landlord5' },
+    ];
+    const demoDocuments = [
+      { id: 'd1', property_id: 'demo1', document_type: 'Gas Safety Certificate', expiry_date: yesterday.toISOString().split('T')[0] },
+      { id: 'd2', property_id: 'demo1', document_type: 'EPC (Energy Performance)', expiry_date: in200.toISOString().split('T')[0] },
+      { id: 'd3', property_id: 'demo2', document_type: 'EICR (Electrical Report)', expiry_date: in28.toISOString().split('T')[0] },
+      { id: 'd4', property_id: 'demo2', document_type: 'Gas Safety Certificate', expiry_date: in75.toISOString().split('T')[0] },
+      { id: 'd5', property_id: 'demo3', document_type: 'Gas Safety Certificate', expiry_date: in200.toISOString().split('T')[0] },
+      { id: 'd6', property_id: 'demo3', document_type: 'EICR (Electrical Report)', expiry_date: in200.toISOString().split('T')[0] },
+      { id: 'd7', property_id: 'demo3', document_type: 'EPC (Energy Performance)', expiry_date: in200.toISOString().split('T')[0] },
+      { id: 'd8', property_id: 'demo5', document_type: 'Gas Safety Certificate', expiry_date: in75.toISOString().split('T')[0] },
+    ];
+    const demoLandlords = [
+      { id: 'demo_landlord1', email: 'david.hughes@email.com', full_name: 'David Hughes' },
+      { id: 'demo_landlord2', email: 'sarah.jones@email.com', full_name: 'Sarah Jones' },
+      { id: 'demo_landlord3', email: 'gareth.williams@email.com', full_name: 'Gareth Williams' },
+      { id: 'demo_landlord4', email: 'emma.davies@email.com', full_name: 'Emma Davies' },
+      { id: 'demo_landlord5', email: 'james.thomas@email.com', full_name: 'James Thomas' },
+    ];
+    const displayProperties = agentDemoMode ? demoProperties : agentProperties;
+    const displayDocuments = agentDemoMode ? demoDocuments : agentDocuments;
+    const displayLandlords = agentDemoMode ? demoLandlords : agentLandlords;
+
     // Agent paywall
     if (agentTrialExpired) {
       return (
@@ -1414,17 +1474,37 @@ function App() {
       return docs.sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
     };
 
-    const workQueue = {
-      expired: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
-      urgent: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'urgent') && !agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
-      soon: agentProperties.filter(p => agentDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'soon') && !agentDocuments.some(d => d.property_id === p.id && ['expired','urgent'].includes(getExpiryStatus(d.expiry_date)?.type))),
+    const getHealthScoreD = (propertyId) => {
+      const docs = displayDocuments.filter(d => d.property_id === propertyId);
+      if (docs.length === 0) return 0;
+      let score = 100;
+      docs.forEach(doc => {
+        const status = getExpiryStatus(doc.expiry_date);
+        if (!status) return;
+        if (status.type === 'expired') score -= 50;
+        else if (status.type === 'urgent') score -= 25;
+        else if (status.type === 'soon') score -= 10;
+      });
+      return Math.max(0, score);
+    };
+    const getLandlordD = (property) => displayLandlords.find(l => l.id === property.user_id);
+    const getNextExpiryD = (propertyId) => {
+      const docs = displayDocuments.filter(d => d.property_id === propertyId && d.expiry_date);
+      if (!docs.length) return null;
+      return docs.sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
     };
 
-    const filteredAndSearched = agentProperties.filter(p => {
-      const score = getHealthScore(p.id);
-      const landlord = getLandlordForProperty(p);
+    const workQueue = {
+      expired: displayProperties.filter(p => displayDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
+      urgent: displayProperties.filter(p => displayDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'urgent') && !displayDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'expired')),
+      soon: displayProperties.filter(p => displayDocuments.some(d => d.property_id === p.id && getExpiryStatus(d.expiry_date)?.type === 'soon') && !displayDocuments.some(d => d.property_id === p.id && ['expired','urgent'].includes(getExpiryStatus(d.expiry_date)?.type))),
+    };
+
+    const filteredAndSearched = displayProperties.filter(p => {
+      const score = getHealthScoreD(p.id);
+      const landlord = getLandlordD(p);
       const matchesSearch = !agentSearch || p.address_line_1.toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.email || '').toLowerCase().includes(agentSearch.toLowerCase());
-      const matchesFilter = agentFilter === 'all' || (agentFilter === 'red' && score < 50) || (agentFilter === 'amber' && score >= 50 && score < 80) || (agentFilter === 'green' && score >= 80) || (agentFilter === 'none' && agentDocuments.filter(d => d.property_id === p.id).length === 0);
+      const matchesFilter = agentFilter === 'all' || (agentFilter === 'red' && score < 50) || (agentFilter === 'amber' && score >= 50 && score < 80) || (agentFilter === 'green' && score >= 80) || (agentFilter === 'none' && displayDocuments.filter(d => d.property_id === p.id).length === 0);
       return matchesSearch && matchesFilter;
     });
 
@@ -1721,11 +1801,16 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+            <button onClick={() => setAgentDemoMode(!agentDemoMode)} style={{ padding: '6px 12px', background: agentDemoMode ? '#f59e0b' : 'rgba(245,158,11,0.15)', color: agentDemoMode ? white : '#f59e0b', border: `1px solid rgba(245,158,11,0.4)`, borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+              {agentDemoMode ? '👁 Demo ON' : '👁 Demo'}
+            </button>
             <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
           </div>
         </div>
 
         <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+
+          {agentDemoMode && <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: '#f59e0b', fontWeight: '700', fontSize: '13px' }}>👁 Demo Mode — showing sample portfolio data. Click "Demo ON" to return to your live data.</span></div>}
 
           {/* Work Queue — Heart Attack Dashboard */}
           {(workQueue.expired.length > 0 || workQueue.urgent.length > 0) && (
@@ -1757,12 +1842,12 @@ function App() {
           {/* Stats */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Properties', value: agentProperties.length, color: blue, sub: 'In your portfolio' },
+              { label: 'Properties', value: displayProperties.length, color: blue, sub: 'In your portfolio' },
               { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent' },
               { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days' },
-              { label: 'Compliant', value: agentProperties.filter(p => getHealthScore(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+' },
-              { label: 'Compliance %', value: agentProperties.length > 0 ? `${Math.round((agentProperties.filter(p => getHealthScore(p.id) >= 80).length / agentProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health' },
-              { label: 'Landlords', value: agentLandlords.length, color: '#4a9eff', sub: 'Linked accounts' },
+              { label: 'Compliant', value: displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+' },
+              { label: 'Compliance %', value: displayProperties.length > 0 ? `${Math.round((displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length / displayProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health' },
+              { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts' },
             ].map((s, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px' }}>
                 <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
@@ -1773,7 +1858,7 @@ function App() {
           </div>
 
           {/* Invite Link */}
-          <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '16px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '16px 20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
               <p style={{ margin: '0 0 2px', color: 'white', fontWeight: '700', fontSize: '13px' }}>🔗 Landlord Invitation Link</p>
               <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Share with landlords to link them automatically</p>
@@ -1782,7 +1867,26 @@ function App() {
             <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 16px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {inviteCopied ? '✓ Copied!' : 'Copy Link'}
             </button>
+            <button onClick={() => setShowInviteForm(!showInviteForm)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✉️ Invite by Email
+            </button>
           </div>
+
+          {/* Invite by email form */}
+          {showInviteForm && (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '14px', padding: '20px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>✉️ Invite a Landlord by Email</p>
+              <p style={{ margin: '0 0 16px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Send your landlord a personalised invitation email with your unique link included.</p>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <input type="text" placeholder="Landlord name (optional)" value={inviteLandlordName} onChange={e => setInviteLandlordName(e.target.value)} style={{ flex: 1, minWidth: '180px', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+                <input type="email" placeholder="Landlord email address" value={inviteLandlordEmail} onChange={e => setInviteLandlordEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleInviteLandlord()} style={{ flex: 2, minWidth: '220px', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+                <button onClick={handleInviteLandlord} disabled={inviteSending || !inviteLandlordEmail} style={{ padding: '10px 20px', background: inviteSent ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', opacity: !inviteLandlordEmail ? 0.5 : 1 }}>
+                  {inviteSent ? '✓ Sent!' : inviteSending ? 'Sending...' : 'Send Invite'}
+                </button>
+              </div>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>They'll receive an email from The Landlord Mate with your invitation link and instructions to sign up.</p>
+            </div>
+          )}
 
           {/* Search + Filter + Export */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1824,10 +1928,10 @@ function App() {
                 ))}
               </div>
               {filteredAndSearched.map((property, i) => {
-                const score = getHealthScore(property.id);
+                const score = getHealthScoreD(property.id);
                 const scoreColor = getHealthColor(score);
-                const nextExpiry = getNextExpiry(property.id);
-                const landlord = getLandlordForProperty(property);
+                const nextExpiry = getNextExpiryD(property.id);
+                const landlord = getLandlordD(property);
                 const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
                 return (
                   <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
