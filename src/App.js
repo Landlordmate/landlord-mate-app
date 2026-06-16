@@ -406,7 +406,11 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
     <div style={{ width: '220px', minHeight: '100vh', background: '#0d1b2a', borderRight: '1px solid rgba(43,124,211,0.15)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(43,124,211,0.15)', cursor: 'pointer' }} onClick={() => setScreen('dashboard')}>
         <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
-        {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '36px', objectFit: 'contain', marginTop: '8px', display: 'block', borderRadius: '4px' }} />}
+        {landlordLogoUrl && (
+          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
+            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '52px', objectFit: 'contain', display: 'block', borderRadius: '6px', maxWidth: '160px' }} />
+          </div>
+        )}
       </div>
       <div style={{ padding: '16px 0', flex: 1 }}>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
@@ -696,6 +700,10 @@ function App() {
   const [logoSaved, setLogoSaved] = useState(false);
   const [landlordLogoUrl, setLandlordLogoUrl] = useState('');
   const [landlordLogoSaved, setLandlordLogoSaved] = useState(false);
+  const [pendingLandlordLogo, setPendingLandlordLogo] = useState(null);
+  const [pendingLandlordLogoPreview, setPendingLandlordLogoPreview] = useState('');
+  const [pendingAgencyLogo, setPendingAgencyLogo] = useState(null);
+  const [pendingAgencyLogoPreview, setPendingAgencyLogoPreview] = useState('');
   const [propertyPhotoUrl, setPropertyPhotoUrl] = useState('');
   const [showPrintProperty, setShowPrintProperty] = useState(false);
   const [bulkChasing, setBulkChasing] = useState(false);
@@ -879,6 +887,58 @@ function App() {
       setLandlordLogoSaved(true);
       setTimeout(() => setLandlordLogoSaved(false), 3000);
     }
+  };
+
+  const handleLandlordLogoSelect = (file) => {
+    if (!file) return;
+    setPendingLandlordLogo(file);
+    setPendingLandlordLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleLandlordLogoSave = async () => {
+    if (!pendingLandlordLogo) return;
+    await handleLandlordLogoUpload(pendingLandlordLogo);
+    setPendingLandlordLogo(null);
+    setPendingLandlordLogoPreview('');
+  };
+
+  const handleLandlordLogoRemove = async () => {
+    await supabase.from('users').update({ logo_url: null }).eq('id', user.id);
+    setLandlordLogoUrl('');
+    setPendingLandlordLogo(null);
+    setPendingLandlordLogoPreview('');
+  };
+
+  const handleAgencyLogoSelect = (file) => {
+    if (!file) return;
+    setPendingAgencyLogo(file);
+    setPendingAgencyLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleAgencyLogoSave = async () => {
+    if (!pendingAgencyLogo) return;
+    setUploadingLogo(true);
+    const ext = pendingAgencyLogo.name.split('.').pop();
+    const path = `${user.id}.${ext}`;
+    const { error } = await supabase.storage.from('logos').upload(path, pendingAgencyLogo, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('logos').getPublicUrl(path);
+      await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      setAgencyLogoUrl(data.publicUrl);
+      setUserRecord({ ...userRecord, logo_url: data.publicUrl });
+      setLogoSaved(true);
+      setTimeout(() => setLogoSaved(false), 3000);
+    }
+    setPendingAgencyLogo(null);
+    setPendingAgencyLogoPreview('');
+    setUploadingLogo(false);
+  };
+
+  const handleAgencyLogoRemove = async () => {
+    await supabase.from('users').update({ logo_url: null }).eq('id', user.id);
+    setAgencyLogoUrl('');
+    setPendingAgencyLogo(null);
+    setPendingAgencyLogoPreview('');
   };
 
   const handlePropertyPhotoUpload = async (file, propertyId) => {
@@ -1867,11 +1927,15 @@ function App() {
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 16px' }}>{user?.email}</p>
               
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px' }} />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <input type="file" accept="image/*" onChange={e => { setLogoSaved(false); handleLogoUpload(e.target.files[0]).then(() => { setLogoSaved(true); setTimeout(() => setLogoSaved(false), 3000); }); }} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', flex: 1 }} />
+              {(pendingAgencyLogoPreview || agencyLogoUrl) && (
+                <img src={pendingAgencyLogoPreview || agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'rgba(255,255,255,0.05)', padding: '8px' }} />
+              )}
+              <input type="file" accept="image/*" onChange={e => handleAgencyLogoSelect(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', display: 'block' }} />
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                {pendingAgencyLogoPreview && <button onClick={handleAgencyLogoSave} disabled={uploadingLogo} style={{ padding: '8px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>{uploadingLogo ? 'Saving...' : 'Save Logo'}</button>}
+                {agencyLogoUrl && !pendingAgencyLogoPreview && <button onClick={handleAgencyLogoRemove} style={{ padding: '8px 16px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Remove Logo</button>}
+                {pendingAgencyLogoPreview && <button onClick={() => { setPendingAgencyLogo(null); setPendingAgencyLogoPreview(''); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>}
               </div>
-              {uploadingLogo && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 8px' }}>Uploading...</p>}
               {logoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>✓ Logo saved!</p>}
               <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '12px 16px' }}>
                 <p style={{ margin: '0 0 4px', color: '#7db3e8', fontSize: '13px', fontWeight: '700' }}>Your Agent Code</p>
@@ -2844,9 +2908,16 @@ function App() {
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>BRANDING</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Your Logo</p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Upload your company logo — shows in your dashboard header.</p>
-            {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px' }} />}
-            <input type="file" accept="image/*" onChange={e => handleLandlordLogoUpload(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }} />
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Upload your company logo — shows in your dashboard sidebar.</p>
+            {(pendingLandlordLogoPreview || landlordLogoUrl) && (
+              <img src={pendingLandlordLogoPreview || landlordLogoUrl} alt="Your logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'rgba(255,255,255,0.05)', padding: '8px' }} />
+            )}
+            <input type="file" accept="image/*" onChange={e => handleLandlordLogoSelect(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', display: 'block' }} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {pendingLandlordLogoPreview && <button onClick={handleLandlordLogoSave} style={{ padding: '8px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Save Logo</button>}
+              {landlordLogoUrl && !pendingLandlordLogoPreview && <button onClick={handleLandlordLogoRemove} style={{ padding: '8px 16px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Remove Logo</button>}
+              {pendingLandlordLogoPreview && <button onClick={() => { setPendingLandlordLogo(null); setPendingLandlordLogoPreview(''); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>}
+            </div>
             {landlordLogoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>✓ Logo saved!</p>}
           </div>
 
