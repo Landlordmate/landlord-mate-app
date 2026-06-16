@@ -561,8 +561,11 @@ function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocum
     <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
       {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} landlordLogoUrl={landlordLogoUrl} />}
       {isMobile && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
-          <img src={logo} alt="The Landlord Mate" style={{ height: '36px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '36px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
+            {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '36px', objectFit: 'contain', borderRadius: '4px', maxWidth: '100px' }} />}
+          </div>
           <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
         </div>
       )}
@@ -950,6 +953,9 @@ function App() {
       const { data } = supabase.storage.from('logos').getPublicUrl(path);
       await supabase.from('properties').update({ photo_url: data.publicUrl }).eq('id', propertyId);
       setProperties(properties.map(p => p.id === propertyId ? { ...p, photo_url: data.publicUrl } : p));
+      if (selectedProperty?.id === propertyId) {
+        setSelectedProperty({ ...selectedProperty, photo_url: data.publicUrl });
+      }
     }
   };
 
@@ -2154,15 +2160,18 @@ function App() {
           
           {/* Property photo */}
           {selectedProperty.photo_url ? (
-            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', height: '180px' }}>
+            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', height: '200px' }}>
               <img src={selectedProperty.photo_url} alt={selectedProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              <label style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                📷 Change Photo
-                <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
-              </label>
+              <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '6px' }}>
+                <label style={{ background: 'rgba(0,0,0,0.65)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                  📷 Change
+                  <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
+                </label>
+                <button onClick={async () => { await supabase.from('properties').update({ photo_url: null }).eq('id', selectedProperty.id); setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, photo_url: null } : p)); setSelectedProperty({ ...selectedProperty, photo_url: null }); }} style={{ background: 'rgba(239,68,68,0.8)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>🗑 Remove</button>
+              </div>
             </div>
           ) : (
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '14px 16px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>
               📷 Add a photo of this property
               <input type="file" accept="image/*" onChange={e => handlePropertyPhotoUpload(e.target.files[0], selectedProperty.id)} style={{ display: 'none' }} />
             </label>
@@ -2515,15 +2524,22 @@ function App() {
           )}
 
           {properties.map(p => (
-            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', marginBottom: '12px', cursor: 'pointer', overflow: 'hidden' }}>
-              {p.photo_url && <div style={{ height: '140px', overflow: 'hidden' }}><img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
-              <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', marginBottom: '12px', cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}>
+              {p.photo_url && (
+                <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
+                  <img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(13,27,42,0.8) 100%)' }} />
+                </div>
+              )}
+              <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
                   {!p.photo_url && <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>}
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
-                    <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'capitalize' }}>
-                      {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>Manage Documents →</span>
+                    <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: '12px', textTransform: 'capitalize' }}>
+                      {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>View →</span>
                     </p>
                   </div>
                 </div>
