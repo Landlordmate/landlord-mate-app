@@ -2165,8 +2165,8 @@ function App() {
           
           {/* Property photo */}
           {selectedProperty.photo_url ? (
-            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', height: '200px' }}>
-              <img src={selectedProperty.photo_url} alt={selectedProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', height: isMobile ? '220px' : '300px' }}>
+              <img src={selectedProperty.photo_url} alt={selectedProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
               <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '6px' }}>
                 <label style={{ background: 'rgba(0,0,0,0.65)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                   📷 Change
@@ -2533,8 +2533,8 @@ function App() {
               onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'}
               onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}>
               {p.photo_url && (
-                <div style={{ height: '160px', overflow: 'hidden', position: 'relative' }}>
-                  <img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ height: isMobile ? '180px' : '220px', overflow: 'hidden', position: 'relative' }}>
+                  <img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(13,27,42,0.8) 100%)' }} />
                 </div>
               )}
