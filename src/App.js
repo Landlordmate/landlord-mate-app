@@ -663,6 +663,8 @@ function App() {
   const [subscribing, setSubscribing] = useState(false);
   const [accountType, setAccountType] = useState('landlord');
   const [agencyName, setAgencyName] = useState('');
+  const [agencyNameEdit, setAgencyNameEdit] = useState('');
+  const [agencyNameSaved, setAgencyNameSaved] = useState(false);
   const [referralSource, setReferralSource] = useState('');
   const [agentData, setAgentData] = useState(null);
   const [agentLandlords, setAgentLandlords] = useState([]);
@@ -1814,7 +1816,21 @@ function App() {
             <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', marginBottom: '24px' }}>⚙️ Settings</h1>
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', marginBottom: '16px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Agency Profile</p>
-              <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px' }}>{userRecord?.agency_name || '—'}</p>
+              
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 6px' }}>Agency Name</p>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input type="text" placeholder={userRecord?.agency_name || 'Agency name'} value={agencyNameEdit} onChange={e => setAgencyNameEdit(e.target.value)} style={{ flex: 1, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+                <button onClick={async () => {
+                  if (!agencyNameEdit.trim()) return;
+                  await supabase.from('users').update({ agency_name: agencyNameEdit.trim() }).eq('id', user.id);
+                  setUserRecord({ ...userRecord, agency_name: agencyNameEdit.trim() });
+                  setAgencyNameSaved(true);
+                  setAgencyNameEdit('');
+                  setTimeout(() => setAgencyNameSaved(false), 3000);
+                }} style={{ padding: '10px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Save</button>
+              </div>
+              {agencyNameSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '-10px 0 12px' }}>✓ Agency name updated!</p>}
+              
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 16px' }}>{user?.email}</p>
               
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
