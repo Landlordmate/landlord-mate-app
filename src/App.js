@@ -555,7 +555,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
   );
 }
 
-function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocuments, children }) {
+function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocuments, children, landlordLogoUrl }) {
   const isMobile = useIsMobile();
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
@@ -2137,7 +2137,7 @@ function App() {
 
   if (user && showOnboarding) {
     return (
-      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <OnboardingWizard
           onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
           onAddProperty={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
@@ -2148,7 +2148,7 @@ function App() {
 
   if (user && screen === 'property' && selectedProperty) {
     return (
-      <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
           
@@ -2479,7 +2479,7 @@ function App() {
 
   if (user && screen === 'properties') {
     return (
-      <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>All Properties</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Click a property to manage its compliance documents.</p>
@@ -2586,7 +2586,7 @@ function App() {
 
   if (user && screen === 'landlordocs') {
     return (
-      <AppShell screen="landlordocs" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="landlordocs" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🪪 My Documents</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Your personal landlord documents — stored once, available always.</p>
@@ -2669,7 +2669,7 @@ function App() {
   if (user && screen === 'letters') {
 
     return (
-      <AppShell screen="letters" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="letters" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>📝 Letter Templates</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '24px' }}>Professional letter templates for landlords. Fill in the details, copy and send.</p>
@@ -2749,7 +2749,7 @@ function App() {
     ];
 
     return (
-      <AppShell screen="faq" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="faq" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '6px' }}>❓ Help & FAQs</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '8px' }}>Got a question? We've got answers. Can't find what you need?</p>
@@ -2781,7 +2781,7 @@ function App() {
 
   if (user && screen === 'wales') {
     return (
-      <AppShell screen="wales" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="wales" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🏴󠁧󠁢󠁷󠁬󠁳󠁥 Wales Compliance Centre</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Everything you need under the Renting Homes (Wales) Act 2016.</p>
@@ -2872,7 +2872,7 @@ function App() {
 
   if (user && screen === 'settings') {
     return (
-      <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '600px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>Settings</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Manage your account and preferences.</p>
@@ -3052,7 +3052,7 @@ function App() {
 
   if (user) {
     return (
-      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments}>
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <Dashboard
           properties={properties}
           documents={allDocuments}
