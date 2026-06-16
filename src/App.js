@@ -561,15 +561,20 @@ function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocum
     <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
       {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} landlordLogoUrl={landlordLogoUrl} />}
       {isMobile && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, height: '64px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '36px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
-            {landlordLogoUrl && <img src={landlordLogoUrl} alt="Your logo" style={{ height: '36px', objectFit: 'contain', borderRadius: '4px', maxWidth: '100px' }} />}
+            <img src={logo} alt="The Landlord Mate" style={{ height: '48px', cursor: 'pointer' }} onClick={() => setScreen('dashboard')} />
+            {landlordLogoUrl && (
+              <>
+                <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.2)' }} />
+                <img src={landlordLogoUrl} alt="Your logo" style={{ height: '44px', objectFit: 'contain', borderRadius: '4px', maxWidth: '120px' }} />
+              </>
+            )}
           </div>
           <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
         </div>
       )}
-      <div style={{ flex: 1, overflowY: 'auto', marginTop: isMobile ? '60px' : 0 }}>
+      <div style={{ flex: 1, overflowY: 'auto', marginTop: isMobile ? '64px' : 0 }}>
         {children}
       </div>
       {isMobile && <BottomNav activeScreen={screen} setScreen={setScreen} />}
