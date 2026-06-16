@@ -418,6 +418,20 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
         {navItem('settings', '⚙️', 'Settings')}
       </div>
+      <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
+        <button onClick={() => {
+          const shareUrl = 'https://app.thelandlordmate.com';
+          const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 14 days:';
+          if (navigator.share) {
+            navigator.share({ title: 'The Landlord Mate', text: shareText, url: shareUrl });
+          } else {
+            navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+            alert('Link copied! Share it with other landlords.');
+          }
+        }} style={{ width: '100%', padding: '8px 12px', background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '8px', color: blue, fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', textAlign: 'left' }}>
+          🔗 Share with a landlord
+        </button>
+      </div>
       <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: blue, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>
@@ -491,6 +505,13 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
         <div style={{ marginBottom: '24px', textAlign: 'right' }}>
           <button onClick={onPrintReport} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
             🖨️ Print Compliance Report
+          </button>
+          <button onClick={() => {
+            const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 14 days: https://app.thelandlordmate.com';
+            if (navigator.share) { navigator.share({ title: 'The Landlord Mate', text: shareText, url: 'https://app.thelandlordmate.com' }); }
+            else { navigator.clipboard.writeText(shareText); alert('Copied! Share with other landlords.'); }
+          }} style={{ padding: '10px 20px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+            🔗 Share with a landlord
           </button>
         </div>
       )}
