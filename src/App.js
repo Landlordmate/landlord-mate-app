@@ -408,7 +408,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
         {landlordLogoUrl && (
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
-            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '52px', objectFit: 'contain', display: 'block', borderRadius: '6px', maxWidth: '160px' }} />
+            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '52px', objectFit: 'contain', display: 'block', borderRadius: '6px', maxWidth: '160px', background: 'white', padding: '6px 10px' }} />
           </div>
         )}
       </div>
@@ -567,7 +567,7 @@ function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocum
             {landlordLogoUrl && (
               <>
                 <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.2)' }} />
-                <img src={landlordLogoUrl} alt="Your logo" style={{ height: '44px', objectFit: 'contain', borderRadius: '4px', maxWidth: '120px' }} />
+                <img src={landlordLogoUrl} alt="Your logo" style={{ height: '44px', objectFit: 'contain', borderRadius: '6px', maxWidth: '120px', background: 'white', padding: '4px 8px' }} />
               </>
             )}
           </div>
@@ -1853,7 +1853,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '4px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -1906,7 +1906,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '4px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -1939,7 +1939,7 @@ function App() {
               
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
               {(pendingAgencyLogoPreview || agencyLogoUrl) && (
-                <img src={pendingAgencyLogoPreview || agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'rgba(255,255,255,0.05)', padding: '8px' }} />
+                <img src={pendingAgencyLogoPreview || agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'white', padding: '8px 12px' }} />
               )}
               <input type="file" accept="image/*" onChange={e => handleAgencyLogoSelect(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', display: 'block' }} />
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -1977,7 +1977,7 @@ function App() {
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '4px' }} />}
+            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
             <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2931,7 +2931,7 @@ function App() {
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Your Logo</p>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Upload your company logo — shows in your dashboard sidebar.</p>
             {(pendingLandlordLogoPreview || landlordLogoUrl) && (
-              <img src={pendingLandlordLogoPreview || landlordLogoUrl} alt="Your logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'rgba(255,255,255,0.05)', padding: '8px' }} />
+              <img src={pendingLandlordLogoPreview || landlordLogoUrl} alt="Your logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'white', padding: '8px 12px' }} />
             )}
             <input type="file" accept="image/*" onChange={e => handleLandlordLogoSelect(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', display: 'block' }} />
             <div style={{ display: 'flex', gap: '8px' }}>
