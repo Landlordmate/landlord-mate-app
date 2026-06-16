@@ -690,6 +690,7 @@ function App() {
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [agencyLogoUrl, setAgencyLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoSaved, setLogoSaved] = useState(false);
   const [showPrintProperty, setShowPrintProperty] = useState(false);
   const [bulkChasing, setBulkChasing] = useState(false);
   const [bulkChaseResult, setBulkChaseResult] = useState('');
@@ -846,12 +847,15 @@ function App() {
     if (!file) return;
     setUploadingLogo(true);
     const ext = file.name.split('.').pop();
-    const path = `logos/${user.id}.${ext}`;
-    const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
+    const path = `${user.id}.${ext}`;
+    const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
     if (!error) {
-      const { data } = supabase.storage.from('documents').getPublicUrl(path);
+      const { data } = supabase.storage.from('logos').getPublicUrl(path);
       await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
       setAgencyLogoUrl(data.publicUrl);
+      setUserRecord({ ...userRecord, logo_url: data.publicUrl });
+    } else {
+      console.error('Logo upload error:', error);
     }
     setUploadingLogo(false);
   };
@@ -1815,10 +1819,11 @@ function App() {
               
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
               {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px' }} />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }} />
-                {uploadingLogo && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Uploading...</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <input type="file" accept="image/*" onChange={e => { setLogoSaved(false); handleLogoUpload(e.target.files[0]).then(() => { setLogoSaved(true); setTimeout(() => setLogoSaved(false), 3000); }); }} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', flex: 1 }} />
               </div>
+              {uploadingLogo && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 8px' }}>Uploading...</p>}
+              {logoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>✓ Logo saved!</p>}
               <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '12px 16px' }}>
                 <p style={{ margin: '0 0 4px', color: '#7db3e8', fontSize: '13px', fontWeight: '700' }}>Your Agent Code</p>
                 <p style={{ margin: 0, color: 'white', fontSize: '13px', fontFamily: 'monospace' }}>{userRecord?.agent_code}</p>
