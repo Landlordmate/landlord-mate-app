@@ -54,7 +54,7 @@ function getExpiryStatus(expiryDate) {
 }
 
 function getTrialStatus(trialEndsAt) {
-  if (!trialEndsAt) return { expired: false, daysLeft: 14 };
+  if (!trialEndsAt) return { expired: false, daysLeft: 7 };
   const now = new Date();
   const end = new Date(trialEndsAt);
   const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
@@ -133,7 +133,7 @@ function CompliancePieChart({ documents }) {
   const noExpiry = documents.filter(d => !d.expiry_date).length;
   const total = documents.length;
   if (total === 0) return null;
-  const size = 120, cx = 60, cy = 60, r = 44, innerR = 26;
+  const size = 180, cx = 90, cy = 90, r = 66, innerR = 39;
   const segments = [
     { count: good, color: '#22c55e', label: 'Compliant' },
     { count: soon, color: '#eab308', label: 'Expiring Soon' },
@@ -160,8 +160,8 @@ function CompliancePieChart({ documents }) {
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
           {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} opacity="0.9" />)}
           <circle cx={cx} cy={cy} r={innerR - 2} fill="#0f1e30" />
-          <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="14" fontWeight="900" fontFamily="Nunito, sans-serif">{total}</text>
-          <text x={cx} y={cy + 10} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="8" fontFamily="Nunito, sans-serif">DOCS</text>
+          <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize="20" fontWeight="900" fontFamily="Nunito, sans-serif">{total}</text>
+          <text x={cx} y={cy + 12} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="11" fontFamily="Nunito, sans-serif">DOCS</text>
         </svg>
         <div style={{ flex: 1, minWidth: '140px' }}>
           {[
@@ -255,11 +255,46 @@ function HomeScreenBanner({ onDismiss }) {
 
 function PaywallScreen({ user, onSubscribe, subscribing }) {
   const isMobile = useIsMobile();
+  const [billing, setBilling] = useState('annual');
+
   const plans = [
-    { key: 'starter', name: 'Starter', price: '£149', period: '/year', properties: '1-3 properties', desc: 'Perfect for small landlords', color: blue },
-    { key: 'pro', name: 'Pro', price: '£299', period: '/year', properties: '4-10 properties', desc: 'Most popular', color: '#7c3aed', highlight: true },
-    { key: 'portfolio', name: 'Portfolio', price: '£499', period: '/year', properties: 'Unlimited properties', desc: 'Serious portfolio landlords', color: '#059669' },
+    {
+      key: 'starter',
+      name: 'Starter',
+      annualPrice: 149,
+      monthlyPrice: Math.ceil(149 / 10 / 12 * 12),
+      properties: '1-3 properties',
+      desc: 'Perfect for small landlords',
+      color: blue,
+    },
+    {
+      key: 'pro',
+      name: 'Pro',
+      annualPrice: 299,
+      monthlyPrice: Math.ceil(299 / 10 / 12 * 12),
+      properties: '4-10 properties',
+      desc: 'Most popular',
+      color: '#7c3aed',
+      highlight: true,
+    },
+    {
+      key: 'portfolio',
+      name: 'Portfolio',
+      annualPrice: 499,
+      monthlyPrice: Math.ceil(499 / 10 / 12 * 12),
+      properties: 'Unlimited properties',
+      desc: 'Serious portfolio landlords',
+      color: '#059669',
+    },
   ];
+
+  const monthlyPriceIds = {
+    starter: PRICE_IDS.starter,
+    pro: PRICE_IDS.pro,
+    portfolio: PRICE_IDS.portfolio,
+  };
+
+  const getPriceId = (plan) => PRICE_IDS[plan.key];
 
   return (
     <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -267,28 +302,55 @@ function PaywallScreen({ user, onSubscribe, subscribing }) {
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
           <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 12px' }}>Choose a plan to keep managing your compliance documents</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 20px' }}>Choose a plan to keep managing your compliance documents</p>
+
+          {/* Billing toggle */}
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
+            <button
+              onClick={() => setBilling('monthly')}
+              style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: billing === 'monthly' ? 'white' : 'transparent', color: billing === 'monthly' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+            >Monthly</button>
+            <button
+              onClick={() => setBilling('annual')}
+              style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: billing === 'annual' ? 'white' : 'transparent', color: billing === 'annual' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+            >Annual</button>
+          </div>
+          {billing === 'annual' && (
+            <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>Save 2 months free with annual billing</p>
+          )}
+
           <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '8px' }}>
-            <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>🔒 Your documents are safe — subscribe any time to keep access to everything you've uploaded.</p>
+            <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>Your documents are safe — subscribe any time to keep access to everything you have uploaded.</p>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
-          {plans.map(plan => (
-            <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
-              {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
-              <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{plan.price}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{plan.period}</span></p>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
-              <button
-                onClick={() => onSubscribe(PRICE_IDS[plan.key])}
-                disabled={subscribing}
-                style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}
-              >
-                {subscribing ? 'Loading…' : `Choose ${plan.name}`}
-              </button>
-            </div>
-          ))}
+          {plans.map(plan => {
+            const displayPrice = billing === 'annual'
+              ? `£${plan.annualPrice}`
+              : `£${Math.ceil(plan.annualPrice / 10)}`;
+            const period = billing === 'annual' ? '/year' : '/month';
+            const annualEquiv = billing === 'monthly' ? `£${plan.annualPrice}/yr if paid annually` : null;
+
+            return (
+              <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
+                {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
+                <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>
+                  {displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{period}</span>
+                </p>
+                {annualEquiv && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: '2px 0 4px' }}>{annualEquiv}</p>}
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
+                <button
+                  onClick={() => onSubscribe(getPriceId(plan))}
+                  disabled={subscribing}
+                  style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}
+                >
+                  {subscribing ? 'Loading...' : `Choose ${plan.name}`}
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
@@ -427,7 +489,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
       <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
         <button onClick={() => {
           const shareUrl = 'https://app.thelandlordmate.com';
-          const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 14 days:';
+          const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 7 days:';
           if (navigator.share) {
             navigator.share({ title: 'The Landlord Mate', text: shareText, url: shareUrl });
           } else {
@@ -450,6 +512,106 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         </div>
         <button onClick={handleSignOut} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>Sign Out</button>
       </div>
+    </div>
+  );
+}
+
+function AskAnythingWidget() {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  const suggestions = [
+    'What documents do I need as a landlord in Wales?',
+    'How often does a Gas Safety Certificate need renewing?',
+    'What is a Section 173 notice?',
+    'When must I protect a tenancy deposit?',
+  ];
+
+  const handleAsk = async (q) => {
+    const query = q || question;
+    if (!query.trim()) return;
+    setLoading(true);
+    setAnswer('');
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: 'You are a helpful UK landlord compliance assistant. You give clear, practical, plain-English answers about landlord law, compliance documents, certificates, and regulations — with a focus on Wales where relevant. Keep answers concise (under 150 words). Do not give legal advice — always suggest consulting a solicitor for legal matters. End with a brief note if the question is Wales-specific.',
+          messages: [{ role: 'user', content: query }]
+        })
+      });
+      const data = await res.json();
+      const text = data.content?.find(b => b.type === 'text')?.text || 'Sorry, I could not get an answer. Please try again.';
+      setAnswer(text);
+    } catch (e) {
+      setAnswer('Sorry, something went wrong. Please try again.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: open ? '16px' : 0, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>🤖</span>
+          <div>
+            <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '14px' }}>Ask Anything</p>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Instant answers on landlord law and compliance</p>
+          </div>
+        </div>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '18px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
+      </div>
+
+      {open && (
+        <div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            {suggestions.map((s, i) => (
+              <button key={i} onClick={() => { setQuestion(s); handleAsk(s); }} style={{ background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', color: '#7db3e8', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              placeholder="Ask a question about landlord compliance..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAsk(); }}
+              style={{ flex: 1, padding: '12px 16px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', color: 'white', fontSize: '14px', fontFamily: font, outline: 'none' }}
+            />
+            <button
+              onClick={() => handleAsk()}
+              disabled={loading}
+              style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, whiteSpace: 'nowrap' }}
+            >
+              {loading ? '...' : 'Ask'}
+            </button>
+          </div>
+
+          {loading && (
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '16px', height: '16px', border: '2px solid rgba(43,124,211,0.3)', borderTopColor: blue, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Thinking...</p>
+            </div>
+          )}
+
+          {answer && !loading && (
+            <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '16px 20px' }}>
+              <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Answer</p>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{answer}</p>
+              <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>AI-generated — always verify with official sources or a solicitor for legal matters.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -507,13 +669,15 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
 
       {documents.length > 0 && <CompliancePieChart documents={documents} />}
 
+      <AskAnythingWidget />
+
       {properties.length > 0 && (
         <div style={{ marginBottom: '24px', textAlign: 'right' }}>
           <button onClick={onPrintReport} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
             🖨️ Print Compliance Report
           </button>
           <button onClick={() => {
-            const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 14 days: https://app.thelandlordmate.com';
+            const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 7 days: https://app.thelandlordmate.com';
             if (navigator.share) { navigator.share({ title: 'The Landlord Mate', text: shareText, url: 'https://app.thelandlordmate.com' }); }
             else { navigator.clipboard.writeText(shareText); alert('Copied! Share with other landlords.'); }
           }} style={{ padding: '10px 20px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
@@ -3153,7 +3317,7 @@ function App() {
             <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Create your account</h1>
-          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>Start your 14-day free trial</p>
+          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>Start your 7-day free trial</p>
 
           {/* Account type selector */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
