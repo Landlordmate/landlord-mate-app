@@ -525,10 +525,14 @@ function AskAnythingWidget() {
   const isMobile = useIsMobile();
 
   const suggestions = [
-    'What documents do I need as a landlord in Wales?',
+    'What documents do I need for a Welsh tenancy?',
     'How often does a Gas Safety Certificate need renewing?',
     'What is a Section 173 notice?',
     'When must I protect a tenancy deposit?',
+    'What is Rent Smart Wales?',
+    'What is an EICR and when do I need one?',
+    'What is a Written Occupation Contract?',
+    'How much notice must I give a tenant in Wales?',
   ];
 
   const handleAsk = async (q) => {
@@ -537,19 +541,13 @@ function AskAnythingWidget() {
     setLoading(true);
     setAnswer('');
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: 'You are a helpful UK landlord compliance assistant. You give clear, practical, plain-English answers about landlord law, compliance documents, certificates, and regulations — with a focus on Wales where relevant. Keep answers concise (under 150 words). Do not give legal advice — always suggest consulting a solicitor for legal matters. End with a brief note if the question is Wales-specific.',
-          messages: [{ role: 'user', content: query }]
-        })
+        body: JSON.stringify({ question: query })
       });
       const data = await res.json();
-      const text = data.content?.find(b => b.type === 'text')?.text || 'Sorry, I could not get an answer. Please try again.';
-      setAnswer(text);
+      setAnswer(data.answer || 'Sorry, I could not get an answer. Please try again.');
     } catch (e) {
       setAnswer('Sorry, something went wrong. Please try again.');
     }
@@ -605,9 +603,9 @@ function AskAnythingWidget() {
           )}
 
           {answer && !loading && (
-            <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '16px 20px' }}>
-              <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Answer</p>
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{answer}</p>
+            <div style={{ marginTop: '16px', background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '20px 24px' }}>
+              <p style={{ margin: '0 0 10px', color: blue, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Answer</p>
+              <p style={{ margin: 0, color: 'white', fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{answer}</p>
               <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>AI-generated — always verify with official sources or a solicitor for legal matters.</p>
             </div>
           )}
@@ -1392,22 +1390,17 @@ function App() {
       const isWales = userRecord?.country === 'Wales' || userRecord?.account_type === 'agent';
       const systemPrompt = `You are a helpful UK landlord compliance assistant for The Landlord Mate platform. You provide clear, practical advice on landlord compliance, property law, and lettings regulations.${isWales ? ' The user is based in Wales so prioritise Welsh legislation including the Renting Homes (Wales) Act 2016, Rent Smart Wales requirements, Section 173 notices, and Written Occupation Contracts.' : ' Focus on English and UK-wide landlord law including the Renters Rights Act, Gas Safety regulations, EICR requirements and EPC obligations.'} Keep answers concise, practical and in plain English. Always recommend seeking professional legal advice for specific situations.`;
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [
-            ...aiHistory.map(h => ({ role: h.role, content: h.content })),
-            { role: 'user', content: question }
-          ]
+        body: JSON.stringify({ 
+          question,
+          isWales: userRecord?.country === 'Wales' || userRecord?.account_type === 'agent',
+          history: aiHistory.map(h => ({ role: h.role, content: h.content }))
         })
       });
-
       const data = await response.json();
-      const answer = data.content?.[0]?.text || 'Sorry, I could not get an answer. Please try again.';
+      const answer = data.answer || 'Sorry, I could not get an answer. Please try again.';
       setAiHistory(prev => [...prev, { role: 'assistant', content: answer }]);
       setAiAnswer(answer);
     } catch(e) {
