@@ -2032,9 +2032,6 @@ function App() {
               </div>
             )}
 
-          {/* Ask Anything Widget */}
-          <AskAnythingWidget />
-
           </div>
         </div>
       );
@@ -2279,6 +2276,9 @@ function App() {
             ))}
           </div>
 
+          {/* Portfolio Compliance Chart */}
+          {agentDocuments.length > 0 && <CompliancePieChart documents={agentDocuments} />}
+
           {/* Invite Link */}
           <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '16px 20px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1 }}>
@@ -2380,6 +2380,9 @@ function App() {
               })}
             </div>
           )}
+          {/* Ask Anything Widget */}
+          <AskAnythingWidget />
+
         </div>
       </div>
     );
