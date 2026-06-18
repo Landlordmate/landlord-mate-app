@@ -485,6 +485,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
         {navItem('settings', '⚙️', 'Settings')}
         {navItem('faq', '❓', 'Help & FAQs')}
+        {navItem('ai', '🤖', 'Ask Anything AI')}
       </div>
       <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
         <button onClick={() => {
@@ -838,6 +839,11 @@ function App() {
   const [showHomeBanner, setShowHomeBanner] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiHistory, setAiHistory] = useState([]);
+  const [showAiPanel, setShowAiPanel] = useState(false);
   const [accountType, setAccountType] = useState('landlord');
   const [agencyName, setAgencyName] = useState('');
   const [agencyNameEdit, setAgencyNameEdit] = useState('');
@@ -1375,6 +1381,41 @@ function App() {
     setLoading(false);
   };
 
+  const handleAskAI = async () => {
+    if (!aiQuestion.trim() || aiLoading) return;
+    const question = aiQuestion.trim();
+    setAiLoading(true);
+    setAiQuestion('');
+    setAiHistory(prev => [...prev, { role: 'user', content: question }]);
+
+    try {
+      const isWales = userRecord?.country === 'Wales' || userRecord?.account_type === 'agent';
+      const systemPrompt = `You are a helpful UK landlord compliance assistant for The Landlord Mate platform. You provide clear, practical advice on landlord compliance, property law, and lettings regulations.${isWales ? ' The user is based in Wales so prioritise Welsh legislation including the Renting Homes (Wales) Act 2016, Rent Smart Wales requirements, Section 173 notices, and Written Occupation Contracts.' : ' Focus on English and UK-wide landlord law including the Renters Rights Act, Gas Safety regulations, EICR requirements and EPC obligations.'} Keep answers concise, practical and in plain English. Always recommend seeking professional legal advice for specific situations.`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [
+            ...aiHistory.map(h => ({ role: h.role, content: h.content })),
+            { role: 'user', content: question }
+          ]
+        })
+      });
+
+      const data = await response.json();
+      const answer = data.content?.[0]?.text || 'Sorry, I could not get an answer. Please try again.';
+      setAiHistory(prev => [...prev, { role: 'assistant', content: answer }]);
+      setAiAnswer(answer);
+    } catch(e) {
+      setAiHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+    }
+    setAiLoading(false);
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null); setUserRecord(null); setProperties([]); setAllDocuments([]); setSelectedProperty(null); setScreen('login'); setShowOnboarding(false);
@@ -1839,6 +1880,8 @@ function App() {
       { id: 'properties', label: '🏠 Properties' },
       { id: 'templates', label: '📝 Templates' },
       { id: 'settings', label: '⚙️ Settings' },
+      { id: 'ai', label: '🤖 Ask AI' },
+      { id: 'faq', label: '❓ Help' },
     ];
 
     // Property detail view
@@ -2064,6 +2107,104 @@ function App() {
     }
 
     // Settings screen
+    if (agentScreen === 'ai') {
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+              <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
+            <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '4px' }}>🤖 Ask Anything</h1>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '20px' }}>Ask about Welsh compliance law, Renting Homes Act, Rent Smart Wales, or any landlord compliance question.</p>
+            {aiHistory.length === 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>Suggested questions</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {['What is Section 173 notice period in Wales?', 'What documents must landlords provide at tenancy start?', 'What is Rent Smart Wales?', 'How often must Gas Safety certificates be renewed?', 'What is a Written Occupation Contract?', 'What are my liability risks as a letting agent?'].map(q => (
+                    <button key={q} onClick={() => setAiQuestion(q)} style={{ padding: '8px 14px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '20px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>{q}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {aiHistory.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? blue : 'rgba(255,255,255,0.06)', border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+                    {msg.role === 'assistant' && <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700' }}>🤖 The Landlord Mate AI</p>}
+                    <p style={{ margin: 0, color: 'white', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {aiLoading && <div style={{ padding: '12px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.06)', width: 'fit-content' }}><p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Thinking...</p></div>}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <textarea value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskAI(); }}} placeholder="Ask about Welsh compliance law, documents, obligations..." rows={2} style={{ flex: 1, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'none' }} />
+              <button onClick={handleAskAI} disabled={aiLoading || !aiQuestion.trim()} style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1 }}>{aiLoading ? '...' : 'Ask →'}</button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '8px 0 0', textAlign: 'center' }}>For guidance only — always seek professional legal advice for specific situations.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (agentScreen === 'faq') {
+      const agentFaqs = [
+        { q: 'How do I invite landlords to my portfolio?', a: 'Go to your Dashboard and copy your unique Invitation Link. Send it to your landlords via email or WhatsApp. When they sign up using your link they automatically appear in your portfolio — no manual linking needed.' },
+        { q: 'How does the health score work?', a: 'Each property gets a score from 0-100. It starts at 100 and deductions are made for compliance issues: -50 for an expired document, -25 for a document expiring within 30 days, -10 for a document expiring within 90 days. Green is 80+, amber is 50-79, red is below 50.' },
+        { q: 'How do I send a bulk chase to landlords?', a: 'On the Dashboard, tick the checkboxes next to the properties you want to chase, then click the "Chase Landlords" button. The system sends a reminder email to each landlord automatically.' },
+        { q: 'How do I download a compliance report?', a: 'Click on any property in your portfolio, then click the "Compliance Report" button at the top. This generates a print-ready PDF showing all certificates, expiry dates and current status.' },
+        { q: 'How do I add my agency logo?', a: 'Go to Settings and find the Agency Logo section. Click Choose File, select your logo image, preview it, then click Save Logo. Your logo will appear in the header on all screens.' },
+        { q: 'How do message templates work?', a: 'Go to Templates to create and manage your message templates. When you click on a property and go to the Message tab, you can send any template to the landlord. The [property_address], [expiry_date] and [agency_name] placeholders are automatically filled in.' },
+        { q: 'What does the Work Queue show?', a: 'The Work Queue at the top of your dashboard shows properties that need immediate attention — expired certificates in red, documents expiring within 30 days in amber, and those expiring within 90 days in yellow.' },
+        { q: 'Can landlords see my agent notes?', a: 'No — agent notes are completely private. Only you and other agents in your account can see notes added in the Notes tab. Landlords have no visibility of them.' },
+        { q: 'How do I export my portfolio?', a: 'Click the Export CSV button on your dashboard. This downloads a spreadsheet of all your properties with their compliance status, health scores and next expiry dates.' },
+        { q: 'How do I get help?', a: 'Email thelandlordmate@gmail.com and we will respond within 24 hours Monday to Friday.' },
+      ];
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+              <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
+            <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '6px' }}>❓ Help & FAQs</h1>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '8px' }}>Everything you need to know about the agent portal.</p>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700', marginBottom: '24px', display: 'block' }}>Email us at thelandlordmate@gmail.com →</a>
+            <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px' }}>
+              <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📞 Support</p>
+              <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>We respond within 24 hours, Monday to Friday.</p>
+              <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700' }}>thelandlordmate@gmail.com</a>
+            </div>
+            {agentFaqs.map((faq, i) => (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px 24px', marginBottom: '10px' }}>
+                <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>Q: {faq.q}</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: '1.7' }}>{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (agentScreen === 'settings') {
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
@@ -2913,6 +3054,66 @@ function App() {
               </div>
             </div>
           )}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user && screen === 'ai') {
+    return (
+      <AppShell screen="ai" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 64px)' }}>
+          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '4px' }}>🤖 Ask Anything</h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '20px' }}>Ask any question about landlord compliance, Welsh law, documents or your obligations. Powered by AI.</p>
+
+          {/* Suggested questions */}
+          {aiHistory.length === 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>Suggested questions</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {[
+                  'What documents do I need for a Welsh tenancy?',
+                  'How long is a Section 173 notice?',
+                  'When does my Gas Safety certificate need renewing?',
+                  'What is a Written Occupation Contract?',
+                  'What is Rent Smart Wales?',
+                  'What is an EICR and when do I need one?',
+                ].map(q => (
+                  <button key={q} onClick={() => { setAiQuestion(q); }} style={{ padding: '8px 14px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '20px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontFamily: font, cursor: 'pointer', textAlign: 'left' }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat history */}
+          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {aiHistory.map((msg, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? blue : 'rgba(255,255,255,0.06)', border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+                  {msg.role === 'assistant' && <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700' }}>🤖 The Landlord Mate AI</p>}
+                  <p style={{ margin: 0, color: 'white', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                </div>
+              </div>
+            ))}
+            {aiLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '12px 16px', borderRadius: '16px 16px 16px 4px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Thinking...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            <textarea value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskAI(); } }} placeholder="Ask about landlord compliance, Welsh law, documents..." rows={2} style={{ flex: 1, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'none', lineHeight: '1.5' }} />
+            <button onClick={handleAskAI} disabled={aiLoading || !aiQuestion.trim()} style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: aiLoading || !aiQuestion.trim() ? 'not-allowed' : 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+              {aiLoading ? '...' : 'Ask →'}
+            </button>
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '8px 0 0', textAlign: 'center' }}>AI answers are for guidance only — always seek professional legal advice for specific situations.</p>
         </div>
       </AppShell>
     );
