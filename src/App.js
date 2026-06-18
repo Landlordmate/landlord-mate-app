@@ -2108,8 +2108,11 @@ function App() {
             </div>
           </div>
           <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
-            <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '4px' }}>🤖 Ask Anything</h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '20px' }}>Ask about Welsh compliance law, Renting Homes Act, Rent Smart Wales, or any landlord compliance question.</p>
+            <div style={{ textAlign: 'center', marginBottom: '24px', paddingTop: '8px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
+              <h1 style={{ margin: '0 0 8px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h1>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Ask about Welsh compliance law, Renting Homes Act, Rent Smart Wales, or any landlord compliance question.</p>
+            </div>
             {aiHistory.length === 0 && (
               <div style={{ marginBottom: '20px' }}>
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>Suggested questions</p>
@@ -3047,8 +3050,11 @@ function App() {
     return (
       <AppShell screen="ai" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 64px)' }}>
-          <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '4px' }}>🤖 Ask Anything</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '20px' }}>Ask any question about landlord compliance, Welsh law, documents or your obligations. Powered by AI.</p>
+          <div style={{ textAlign: 'center', marginBottom: '24px', paddingTop: '8px' }}>
+            <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
+            <h1 style={{ margin: '0 0 8px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h1>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Ask any question about landlord compliance, Welsh law, documents or your obligations.</p>
+          </div>
 
           {/* Suggested questions */}
           {aiHistory.length === 0 && (
