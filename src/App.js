@@ -2032,12 +2032,14 @@ function App() {
                 </div>
               </div>
             )}
+
+          {/* Ask Anything Widget */}
+          <AskAnythingWidget />
+
           </div>
         </div>
       );
     }
-
-    // Templates screen
     if (agentScreen === 'templates') {
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
