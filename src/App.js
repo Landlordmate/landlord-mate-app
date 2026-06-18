@@ -541,7 +541,7 @@ function AskAnythingWidget() {
     setLoading(true);
     setAnswer('');
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/rapid-worker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: query })
@@ -1390,7 +1390,7 @@ function App() {
       const isWales = userRecord?.country === 'Wales' || userRecord?.account_type === 'agent';
       const systemPrompt = `You are a helpful UK landlord compliance assistant for The Landlord Mate platform. You provide clear, practical advice on landlord compliance, property law, and lettings regulations.${isWales ? ' The user is based in Wales so prioritise Welsh legislation including the Renting Homes (Wales) Act 2016, Rent Smart Wales requirements, Section 173 notices, and Written Occupation Contracts.' : ' Focus on English and UK-wide landlord law including the Renters Rights Act, Gas Safety regulations, EICR requirements and EPC obligations.'} Keep answers concise, practical and in plain English. Always recommend seeking professional legal advice for specific situations.`;
 
-      const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
+      const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/rapid-worker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
