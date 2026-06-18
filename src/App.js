@@ -613,8 +613,10 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
   const actionNeeded = [...expiredDocs, ...urgentDocs];
   const isMobile = useIsMobile();
 
-  const statCard = (label, value, color, sub) => (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: isMobile ? '16px' : '20px 24px', flex: 1, minWidth: isMobile ? '140px' : 'auto' }}>
+  const statCard = (label, value, color, sub, onClick) => (
+    <div onClick={onClick} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: isMobile ? '16px' : '20px 24px', flex: 1, minWidth: isMobile ? '140px' : 'auto', cursor: onClick ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'; }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
       <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.65)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{label}</p>
       <p style={{ margin: '0 0 4px', color: color, fontSize: isMobile ? '28px' : '36px', fontWeight: '900', lineHeight: 1 }}>{value}</p>
       <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{sub}</p>
@@ -650,10 +652,10 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
       {showTrialNudge && <TrialNudgeBanner daysLeft={trialDaysLeft} onSubscribe={onSubscribe} />}
 
       <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
-        {statCard('Properties', properties.length, blue, 'All properties')}
-        {statCard('Documents', documents.length, '#22c55e', 'Stored safely')}
-        {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days')}
-        {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent')}
+        {statCard('Properties', properties.length, blue, 'All properties', () => setScreen('properties'))}
+        {statCard('Documents', documents.length, '#22c55e', 'Stored safely', () => setScreen('properties'))}
+        {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days', () => setScreen('properties'))}
+        {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent', () => setScreen('properties'))}
       </div>
 
       {documents.length > 0 && <CompliancePieChart documents={documents} />}
@@ -1069,6 +1071,10 @@ function App() {
   };
 
   const handleLandlordLogoRemove = async () => {
+    const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+    for (const ext of extensions) {
+      await supabase.storage.from('logos').remove([`landlord_${user.id}.${ext}`]);
+    }
     await supabase.from('users').update({ logo_url: null }).eq('id', user.id);
     setLandlordLogoUrl('');
     setPendingLandlordLogo(null);
@@ -1101,6 +1107,10 @@ function App() {
   };
 
   const handleAgencyLogoRemove = async () => {
+    const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+    for (const ext of extensions) {
+      await supabase.storage.from('logos').remove([`${user.id}.${ext}`]);
+    }
     await supabase.from('users').update({ logo_url: null }).eq('id', user.id);
     setAgencyLogoUrl('');
     setPendingAgencyLogo(null);
@@ -2261,14 +2271,16 @@ function App() {
           {/* Stats */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Properties', value: displayProperties.length, color: blue, sub: 'In your portfolio' },
-              { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent' },
-              { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days' },
-              { label: 'Compliant', value: displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+' },
-              { label: 'Compliance %', value: displayProperties.length > 0 ? `${Math.round((displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length / displayProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health' },
-              { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts' },
+              { label: 'Properties', value: displayProperties.length, color: blue, sub: 'In your portfolio', screen: 'properties' },
+              { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent', screen: 'properties' },
+              { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days', screen: 'properties' },
+              { label: 'Compliant', value: displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+', screen: 'properties' },
+              { label: 'Compliance %', value: displayProperties.length > 0 ? `${Math.round((displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length / displayProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health', screen: null },
+              { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts', screen: 'properties' },
             ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px' }}>
+              <div key={i} onClick={() => s.screen && setAgentScreen(s.screen)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px', cursor: s.screen ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
+                onMouseEnter={e => { if (s.screen) e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'; }}
+                onMouseLeave={e => { if (s.screen) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
                 <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
                 <p style={{ margin: '0 0 2px', color: s.color, fontSize: '28px', fontWeight: '900', lineHeight: 1 }}>{s.value}</p>
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>{s.sub}</p>
@@ -2690,6 +2702,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                    {doc.file_path && <button onClick={() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); window.open(data.publicUrl, '_blank'); }} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>👁 View</button>}
                     <button onClick={() => handleEditDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
@@ -2720,7 +2733,7 @@ function App() {
                 </>
               )}
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => setUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button onClick={handleUpload} disabled={uploading} style={{ ...primaryBtn, flex: 1, opacity: uploading ? 0.7 : 1 }}>{uploading ? 'Uploading…' : 'Upload Document'}</button>
                 <button onClick={() => setShowUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
@@ -2877,6 +2890,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                    {doc.file_path && <button onClick={() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); window.open(data.publicUrl, '_blank'); }} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>👁 View</button>}
                     <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
                 </div>
@@ -2894,7 +2908,7 @@ function App() {
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(optional)</span></label>
               <input type="date" value={landlordExpiryDate} onChange={(e) => setLandlordExpiryDate(e.target.value)} style={inputStyle} />
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setLandlordUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => setLandlordUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button onClick={handleLandlordUpload} disabled={landlordUploading} style={{ ...primaryBtn, flex: 1, opacity: landlordUploading ? 0.7 : 1 }}>{landlordUploading ? 'Uploading…' : 'Upload Document'}</button>
                 <button onClick={() => setShowLandlordUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
