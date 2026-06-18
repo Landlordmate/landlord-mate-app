@@ -470,7 +470,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
         {landlordLogoUrl && (
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
-            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '72px', objectFit: 'contain', display: 'block', borderRadius: '8px', maxWidth: '180px', background: 'white', padding: '8px 12px' }} />
+            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '72px', objectFit: 'contain', display: 'block', maxWidth: '180px' }} />
           </div>
         )}
       </div>
@@ -543,7 +543,7 @@ function AskAnythingWidget() {
     try {
       const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
         body: JSON.stringify({ question: query })
       });
       const data = await res.json();
@@ -555,60 +555,53 @@ function AskAnythingWidget() {
   };
 
   return (
-    <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: open ? '16px' : 0, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '20px' }}>🤖</span>
-          <div>
-            <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '14px' }}>Ask Anything</p>
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Instant answers on landlord law and compliance</p>
-          </div>
+    <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <span style={{ fontSize: '24px' }}>🤖</span>
+        <div>
+          <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '18px' }}>Ask Anything</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Instant answers on landlord law and compliance</p>
         </div>
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '18px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
       </div>
 
-      {open && (
-        <div>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            {suggestions.map((s, i) => (
-              <button key={i} onClick={() => { setQuestion(s); handleAsk(s); }} style={{ background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', color: '#7db3e8', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
-                {s}
-              </button>
-            ))}
-          </div>
+      <div style={{ position: 'relative', marginBottom: '14px' }}>
+        <input
+          type="text"
+          placeholder="Ask about Gas Safe, EICR, Rent Smart Wales, tenancy law..."
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAsk(); }}
+          style={{ width: '100%', padding: '16px 56px 16px 20px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(43,124,211,0.4)', borderRadius: '50px', color: 'white', fontSize: '15px', fontFamily: font, outline: 'none', boxSizing: 'border-box' }}
+        />
+        <button
+          onClick={() => handleAsk()}
+          disabled={loading || !question.trim()}
+          style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', background: blue, color: 'white', border: 'none', borderRadius: '50%', fontSize: '16px', cursor: loading || !question.trim() ? 'not-allowed' : 'pointer', opacity: loading || !question.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          {loading ? '⋯' : '↑'}
+        </button>
+      </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              placeholder="Ask a question about landlord compliance..."
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAsk(); }}
-              style={{ flex: 1, padding: '12px 16px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', color: 'white', fontSize: '14px', fontFamily: font, outline: 'none' }}
-            />
-            <button
-              onClick={() => handleAsk()}
-              disabled={loading}
-              style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, whiteSpace: 'nowrap' }}
-            >
-              {loading ? '...' : 'Ask'}
-            </button>
-          </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {suggestions.map((s, i) => (
+          <button key={i} onClick={() => { setQuestion(s); handleAsk(s); }} style={{ background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', color: '#7db3e8', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+            {s}
+          </button>
+        ))}
+      </div>
 
-          {loading && (
-            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '16px', height: '16px', border: '2px solid rgba(43,124,211,0.3)', borderTopColor: blue, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Thinking...</p>
-            </div>
-          )}
+      {loading && (
+        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '16px', height: '16px', border: '2px solid rgba(43,124,211,0.3)', borderTopColor: blue, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Thinking...</p>
+        </div>
+      )}
 
-          {answer && !loading && (
-            <div style={{ marginTop: '16px', background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '20px 24px' }}>
-              <p style={{ margin: '0 0 10px', color: blue, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Answer</p>
-              <p style={{ margin: 0, color: 'white', fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{answer}</p>
-              <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>AI-generated — always verify with official sources or a solicitor for legal matters.</p>
-            </div>
-          )}
+      {answer && !loading && (
+        <div style={{ marginTop: '16px', background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '20px 24px' }}>
+          <p style={{ margin: '0 0 10px', color: blue, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Answer</p>
+          <p style={{ margin: 0, color: 'white', fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{answer}</p>
+          <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>AI-generated — always verify with official sources or a solicitor for legal matters.</p>
         </div>
       )}
     </div>
@@ -730,7 +723,7 @@ function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocum
             {landlordLogoUrl && (
               <>
                 <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.2)' }} />
-                <img src={landlordLogoUrl} alt="Your logo" style={{ height: '52px', objectFit: 'contain', borderRadius: '8px', maxWidth: '140px', background: 'white', padding: '6px 10px' }} />
+                <img src={landlordLogoUrl} alt="Your logo" style={{ height: '52px', objectFit: 'contain', maxWidth: '140px' }} />
               </>
             )}
           </div>
@@ -1392,7 +1385,7 @@ function App() {
 
       const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
         body: JSON.stringify({ 
           question,
           isWales: userRecord?.country === 'Wales' || userRecord?.account_type === 'agent',
@@ -2053,7 +2046,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2106,7 +2099,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2168,7 +2161,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2204,7 +2197,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2275,7 +2268,7 @@ function App() {
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', borderRadius: '6px', background: 'white', padding: '4px 8px' }} />}
+            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
             <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
