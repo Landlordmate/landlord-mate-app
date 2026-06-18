@@ -556,12 +556,10 @@ function AskAnythingWidget() {
 
   return (
     <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{ fontSize: '24px' }}>🤖</span>
-        <div>
-          <p style={{ margin: 0, color: 'white', fontWeight: '800', fontSize: '18px' }}>Ask Anything</p>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Instant answers on landlord law and compliance</p>
-        </div>
+      <div style={{ textAlign: 'center', marginBottom: '32px', paddingTop: '8px' }}>
+        <p style={{ margin: '0 0 12px', fontSize: '40px' }}>🤖</p>
+        <h2 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h2>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance</p>
       </div>
 
       <div style={{ position: 'relative', marginBottom: '14px' }}>
