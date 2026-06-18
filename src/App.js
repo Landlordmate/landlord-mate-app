@@ -485,7 +485,6 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
         {navItem('settings', '⚙️', 'Settings')}
         {navItem('faq', '❓', 'Help & FAQs')}
-        {navItem('ai', '🤖', 'Ask Anything AI')}
       </div>
       <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
         <button onClick={() => {
@@ -1864,7 +1863,7 @@ function App() {
       { id: 'properties', label: '🏠 Properties' },
       { id: 'templates', label: '📝 Templates' },
       { id: 'settings', label: '⚙️ Settings' },
-      { id: 'ai', label: '🤖 Ask AI' },
+      { id: 'faq', label: '❓ Help' },
       { id: 'faq', label: '❓ Help' },
     ];
 
@@ -2087,60 +2086,6 @@ function App() {
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{t.body}</p>
               </div>
             ))}
-          </div>
-        </div>
-      );
-    }
-
-    // Settings screen
-    if (agentScreen === 'ai') {
-      return (
-        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
-          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
-              <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
-              <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
-              <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
-              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
-            </div>
-          </div>
-          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '24px', paddingTop: '8px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
-              <h1 style={{ margin: '0 0 8px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h1>
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Ask about Welsh compliance law, Renting Homes Act, Rent Smart Wales, or any landlord compliance question.</p>
-            </div>
-            {aiHistory.length === 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>Suggested questions</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {['What is Section 173 notice period in Wales?', 'What documents must landlords provide at tenancy start?', 'What is Rent Smart Wales?', 'How often must Gas Safety certificates be renewed?', 'What is a Written Occupation Contract?', 'What are my liability risks as a letting agent?'].map(q => (
-                    <button key={q} onClick={() => setAiQuestion(q)} style={{ padding: '8px 14px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '20px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>{q}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {aiHistory.map((msg, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? blue : 'rgba(255,255,255,0.06)', border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
-                    {msg.role === 'assistant' && <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700' }}>🤖 The Landlord Mate AI</p>}
-                    <p style={{ margin: 0, color: 'white', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
-                  </div>
-                </div>
-              ))}
-              {aiLoading && <div style={{ padding: '12px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.06)', width: 'fit-content' }}><p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Thinking...</p></div>}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <textarea value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskAI(); }}} placeholder="Ask about Welsh compliance law, documents, obligations..." rows={2} style={{ flex: 1, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'none' }} />
-              <button onClick={handleAskAI} disabled={aiLoading || !aiQuestion.trim()} style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1 }}>{aiLoading ? '...' : 'Ask →'}</button>
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '8px 0 0', textAlign: 'center' }}>For guidance only — always seek professional legal advice for specific situations.</p>
           </div>
         </div>
       );
@@ -3043,69 +2988,6 @@ function App() {
               </div>
             </div>
           )}
-        </div>
-      </AppShell>
-    );
-  }
-
-  if (user && screen === 'ai') {
-    return (
-      <AppShell screen="ai" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
-        <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 64px)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '24px', paddingTop: '8px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
-            <h1 style={{ margin: '0 0 8px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h1>
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Ask any question about landlord compliance, Welsh law, documents or your obligations.</p>
-          </div>
-
-          {/* Suggested questions */}
-          {aiHistory.length === 0 && (
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>Suggested questions</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {[
-                  'What documents do I need for a Welsh tenancy?',
-                  'How long is a Section 173 notice?',
-                  'When does my Gas Safety certificate need renewing?',
-                  'What is a Written Occupation Contract?',
-                  'What is Rent Smart Wales?',
-                  'What is an EICR and when do I need one?',
-                ].map(q => (
-                  <button key={q} onClick={() => { setAiQuestion(q); }} style={{ padding: '8px 14px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '20px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontFamily: font, cursor: 'pointer', textAlign: 'left' }}>
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Chat history */}
-          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {aiHistory.map((msg, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? blue : 'rgba(255,255,255,0.06)', border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
-                  {msg.role === 'assistant' && <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700' }}>🤖 The Landlord Mate AI</p>}
-                  <p style={{ margin: 0, color: 'white', fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
-                </div>
-              </div>
-            ))}
-            {aiLoading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div style={{ padding: '12px 16px', borderRadius: '16px 16px 16px 4px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Thinking...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Input */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-            <textarea value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskAI(); } }} placeholder="Ask about landlord compliance, Welsh law, documents..." rows={2} style={{ flex: 1, padding: '12px 14px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', fontSize: '14px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'none', lineHeight: '1.5' }} />
-            <button onClick={handleAskAI} disabled={aiLoading || !aiQuestion.trim()} style={{ padding: '12px 20px', background: blue, color: 'white', border: 'none', borderRadius: '12px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: aiLoading || !aiQuestion.trim() ? 'not-allowed' : 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-              {aiLoading ? '...' : 'Ask →'}
-            </button>
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '8px 0 0', textAlign: 'center' }}>AI answers are for guidance only — always seek professional legal advice for specific situations.</p>
         </div>
       </AppShell>
     );
