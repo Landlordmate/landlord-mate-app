@@ -611,7 +611,7 @@ function AskAnythingWidget() {
     <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px', paddingTop: '8px' }}>
         <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
-        <h2 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Anything</h2>
+        <h2 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h2>
         <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance</p>
       </div>
 
@@ -2489,7 +2489,7 @@ function App() {
               })}
             </div>
           )}
-          {/* Ask Anything Widget */}
+          {/* Ask Mate Widget */}
           <AskAnythingWidget />
 
         </div>
@@ -3223,8 +3223,12 @@ function App() {
 
   const handleSaveDisplayName = async () => {
     if (!settingsName.trim()) return;
-    const { error } = await supabase.auth.updateUser({ data: { full_name: settingsName.trim() } });
-    if (!error) { setSettingsNameSaved(true); setTimeout(() => setSettingsNameSaved(false), 3000); }
+    const { data, error } = await supabase.auth.updateUser({ data: { full_name: settingsName.trim() } });
+    if (!error) {
+      if (data?.user) setUser(data.user);
+      setSettingsNameSaved(true);
+      setTimeout(() => setSettingsNameSaved(false), 3000);
+    }
   };
 
   const handleChangePassword = async () => {
