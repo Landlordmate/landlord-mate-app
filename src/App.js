@@ -903,6 +903,13 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [forcePaywall, setForcePaywall] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'choose-plan') {
+      setForcePaywall(true);
+    }
+  }, []);
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
