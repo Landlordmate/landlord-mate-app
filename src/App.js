@@ -494,14 +494,18 @@ function BottomNav({ activeScreen, setScreen }) {
   );
 }
 
-function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, documents, landlordLogoUrl }) {
+function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, documents, landlordLogoUrl, setSelectedLetter, setSelectedProperty }) {
   const urgentCount = documents.filter(d => {
     const s = getExpiryStatus(d.expiry_date);
     return s?.type === 'expired' || s?.type === 'urgent';
   }).length;
 
   const navItem = (id, icon, label, badge) => (
-    <div onClick={() => setScreen(id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
+    <div onClick={() => {
+      setScreen(id);
+      if (id === 'letters') setSelectedLetter(null);
+      if (id === 'properties') setSelectedProperty(null);
+    }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
       <span style={{ fontSize: '16px' }}>{icon}</span>
       {label}
       {badge > 0 && <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '50%', width: '18px', height: '18px', fontSize: '11px', fontWeight: '800', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{badge}</span>}
@@ -783,11 +787,11 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
   );
 }
 
-function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocuments, children, landlordLogoUrl }) {
+function AppShell({ screen, setScreen, user, handleSignOut, properties, allDocuments, children, landlordLogoUrl, setSelectedLetter, setSelectedProperty }) {
   const isMobile = useIsMobile();
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: navy, fontFamily: font }}>
-      {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} landlordLogoUrl={landlordLogoUrl} />}
+      {!isMobile && <Sidebar activeScreen={screen} setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} documents={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty} />}
       {isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.15)', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 100, height: '72px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2155,7 +2159,7 @@ function App() {
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); if (n.id === 'properties') setSelectedAgentProperty(null); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
               <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
             </div>
           </div>
@@ -2219,7 +2223,7 @@ function App() {
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); if (n.id === 'properties') setSelectedAgentProperty(null); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
               <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
             </div>
           </div>
@@ -2255,7 +2259,7 @@ function App() {
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); if (n.id === 'properties') setSelectedAgentProperty(null); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
               <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
             </div>
           </div>
@@ -2326,7 +2330,7 @@ function App() {
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+            {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); if (n.id === 'properties') setSelectedAgentProperty(null); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
             <button onClick={() => setAgentDemoMode(!agentDemoMode)} style={{ padding: '6px 12px', background: agentDemoMode ? '#f59e0b' : 'rgba(245,158,11,0.15)', color: agentDemoMode ? 'white' : '#f59e0b', border: `1px solid rgba(245,158,11,0.4)`, borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               {agentDemoMode ? '👁 Demo ON' : '👁 Demo'}
             </button>
@@ -2499,7 +2503,7 @@ function App() {
 
   if (user && showOnboarding) {
     return (
-      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <OnboardingWizard
           user={user}
           onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
@@ -2846,7 +2850,7 @@ function App() {
 
   if (user && screen === 'properties') {
     return (
-      <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>All Properties</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Click a property to manage its compliance documents.</p>
@@ -2960,7 +2964,7 @@ function App() {
 
   if (user && screen === 'landlordocs') {
     return (
-      <AppShell screen="landlordocs" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="landlordocs" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🪪 My Documents</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Your personal landlord documents — stored once, available always.</p>
@@ -3044,7 +3048,7 @@ function App() {
   if (user && screen === 'letters') {
 
     return (
-      <AppShell screen="letters" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="letters" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>📝 Letter Templates</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '24px' }}>Professional letter templates for landlords. Fill in the details, copy and send.</p>
@@ -3124,7 +3128,7 @@ function App() {
     ];
 
     return (
-      <AppShell screen="faq" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="faq" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '6px' }}>❓ Help & FAQs</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '8px' }}>Got a question? We've got answers. Can't find what you need?</p>
@@ -3156,7 +3160,7 @@ function App() {
 
   if (user && screen === 'wales') {
     return (
-      <AppShell screen="wales" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="wales" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🏴󠁧󠁢󠁷󠁬󠁳󠁥 Wales Compliance Centre</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Everything you need under the Renting Homes (Wales) Act 2016.</p>
@@ -3251,7 +3255,7 @@ function App() {
 
   if (user && screen === 'settings') {
     return (
-      <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '600px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>Settings</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '28px' }}>Manage your account and preferences.</p>
@@ -3431,7 +3435,7 @@ function App() {
 
   if (user) {
     return (
-      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
+      <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <Dashboard
           properties={properties}
           documents={allDocuments}
