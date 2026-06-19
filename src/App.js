@@ -663,10 +663,11 @@ function AskAnythingWidget() {
   );
 }
 
-function Dashboard({ properties, documents, setScreen, setSelectedProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport }) {
-  const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
-  const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
-  const soonDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
+function Dashboard({ properties, documents, setScreen, setSelectedProperty, handleSelectProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport }) {
+  const byExpirySoonest = (a, b) => new Date(a.expiry_date) - new Date(b.expiry_date);
+  const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').sort(byExpirySoonest);
+  const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').sort(byExpirySoonest);
+  const soonDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').sort(byExpirySoonest);
   const goodDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'good');
   const actionNeeded = [...expiredDocs, ...urgentDocs];
   const isMobile = useIsMobile();
@@ -712,8 +713,29 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, user
       <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
         {statCard('Properties', properties.length, blue, 'All properties', () => setScreen('properties'))}
         {statCard('Documents', documents.length, '#22c55e', 'Stored safely', () => setScreen('properties'))}
-        {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days', () => setScreen('properties'))}
-        {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent', () => setScreen('properties'))}
+        {statCard('Expiring', soonDocs.length, '#eab308', 'Within 90 days', () => {
+          if (soonDocs.length > 0) {
+            const targetProperty = properties.find(p => p.id === soonDocs[0].property_id);
+            if (targetProperty) {
+              handleSelectProperty(targetProperty);
+              setScreen('properties');
+              return;
+            }
+          }
+          setScreen('properties');
+        })}
+        {statCard('Action', actionNeeded.length, '#ef4444', 'Expired or urgent', () => {
+          if (actionNeeded.length > 0) {
+            const worstDoc = actionNeeded[0];
+            const targetProperty = properties.find(p => p.id === worstDoc.property_id);
+            if (targetProperty) {
+              handleSelectProperty(targetProperty);
+              setScreen('properties');
+              return;
+            }
+          }
+          setScreen('properties');
+        })}
       </div>
 
       {documents.length > 0 && <CompliancePieChart documents={documents} />}
@@ -2374,13 +2396,21 @@ function App() {
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
             {[
               { label: 'Properties', value: displayProperties.length, color: blue, sub: 'In your portfolio', screen: 'properties' },
-              { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent', screen: 'properties' },
-              { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days', screen: 'properties' },
+              { label: 'Action Needed', value: workQueue.expired.length + workQueue.urgent.length, color: '#ef4444', sub: 'Expired or urgent', screen: 'properties', onClick: () => {
+                const target = workQueue.expired[0] || workQueue.urgent[0];
+                if (target) { handleSelectAgentProperty(target); setAgentScreen('property'); }
+                else setAgentScreen('properties');
+              } },
+              { label: 'Expiring Soon', value: workQueue.soon.length, color: '#eab308', sub: 'Within 90 days', screen: 'properties', onClick: () => {
+                const target = workQueue.soon[0];
+                if (target) { handleSelectAgentProperty(target); setAgentScreen('property'); }
+                else setAgentScreen('properties');
+              } },
               { label: 'Compliant', value: displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+', screen: 'properties' },
               { label: 'Compliance %', value: displayProperties.length > 0 ? `${Math.round((displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length / displayProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health', screen: null },
               { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts', screen: 'properties' },
             ].map((s, i) => (
-              <div key={i} onClick={() => s.screen && setAgentScreen(s.screen)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px', cursor: s.screen ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
+              <div key={i} onClick={() => { if (s.onClick) s.onClick(); else if (s.screen) setAgentScreen(s.screen); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px', cursor: (s.screen || s.onClick) ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
                 onMouseEnter={e => { if (s.screen) e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'; }}
                 onMouseLeave={e => { if (s.screen) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
                 <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.5)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase' }}>{s.label}</p>
@@ -3464,14 +3494,8 @@ function App() {
           showTrialNudge={showTrialNudge}
           onSubscribe={() => handleSubscribe(PRICE_IDS.starter)}
           onPrintReport={() => setShowPrintReport(true)}
-          setSelectedProperty={(p) => {
-            setSelectedProperty(p);
-            const load = async () => {
-              const { data } = await supabase.from('documents').select('*').eq('property_id', p.id);
-              if (data) setDocuments(data);
-            };
-            load();
-          }}
+          setSelectedProperty={(p) => handleSelectProperty(p)}
+          handleSelectProperty={handleSelectProperty}
         />
       </AppShell>
     );
