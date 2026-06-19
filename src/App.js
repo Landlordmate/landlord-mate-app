@@ -182,14 +182,85 @@ function CompliancePieChart({ documents }) {
   );
 }
 
-function OnboardingWizard({ onComplete, onAddProperty }) {
-  const [step, setStep] = useState(1);
+function OnboardingWizard({ onComplete, onAddProperty, user }) {
+  const [step, setStep] = useState(0);
+  const [propertyCount, setPropertyCount] = useState('');
+  const [docNeeds, setDocNeeds] = useState([]);
+  const [saving, setSaving] = useState(false);
   const isMobile = useIsMobile();
+
+  const propertyOptions = ['1', '2-3', '4-5', '6-10', '11-20', '20+'];
+  const docOptions = [
+    { key: 'gas_safe', label: 'Gas Safety Certificate' },
+    { key: 'eicr', label: 'EICR (Electrical)' },
+    { key: 'epc', label: 'EPC' },
+    { key: 'deposit', label: 'Deposit Protection Certificate' },
+    { key: 'tenancy', label: 'Tenancy Agreement' },
+    { key: 'legionella', label: 'Legionella Risk Assessment' },
+  ];
+
+  const toggleDoc = (key) => setDocNeeds(docNeeds.includes(key) ? docNeeds.filter(d => d !== key) : [...docNeeds, key]);
+
+  const recommendedPlan = (count) => {
+    if (count === '1' || count === '2-3') return 'Starter (£149/year)';
+    if (count === '4-5' || count === '6-10') return 'Pro (£299/year)';
+    return 'Portfolio (£499/year)';
+  };
+
+  const saveStep0 = async () => {
+    setSaving(true);
+    try {
+      await supabase.from('users').update({ property_count: propertyCount, doc_needs: docNeeds }).eq('id', user.id);
+    } catch (e) { console.error(e); }
+    setSaving(false);
+    setStep(1);
+  };
+
   const steps = [
     { icon: '🏠', title: 'Add your first property', desc: "Start by adding a rental property. We'll look up the address from your postcode.", action: 'Add Property →', isAdd: true, hint: null },
     { icon: '📄', title: 'Upload a compliance document', desc: "Upload your Gas Safety Certificate, EICR, EPC or any other certificate. Set the expiry date and we'll remind you automatically.", hint: 'We send reminders at 90, 60, 30, 14 and 7 days before expiry.', action: 'Got it →', isAdd: false },
     { icon: '🔗', title: 'Share with your agent', desc: 'Generate a secure link to share your compliance documents with your letting agent instantly — no login required for them.', action: "Let's go! →", isAdd: false, hint: null },
   ];
+
+  if (step === 0) {
+    return (
+      <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1 }}>
+        <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 8px' }}>Welcome! Let's get you set up 👋</h1>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>Just two quick questions first</p>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', marginBottom: '16px' }}>
+            <p style={{ color: 'white', fontWeight: '800', fontSize: '17px', margin: '0 0 14px' }}>How many rental properties do you own?</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '28px' }}>
+              {propertyOptions.map(opt => (
+                <button key={opt} onClick={() => setPropertyCount(opt)} style={{ padding: '10px 18px', borderRadius: '20px', border: propertyCount === opt ? '2px solid #2b7cd3' : '1px solid rgba(255,255,255,0.15)', background: propertyCount === opt ? 'rgba(43,124,211,0.2)' : 'rgba(255,255,255,0.04)', color: propertyCount === opt ? 'white' : 'rgba(255,255,255,0.7)', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>{opt}</button>
+              ))}
+            </div>
+            {propertyCount && (
+              <p style={{ color: '#7db3e8', fontSize: '13px', margin: '0 0 28px', background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '10px 16px' }}>
+                💡 Based on that, <strong>{recommendedPlan(propertyCount)}</strong> would likely suit you best — but you can try everything free for 7 days first.
+              </p>
+            )}
+            <p style={{ color: 'white', fontWeight: '800', fontSize: '17px', margin: '0 0 14px' }}>Which documents do you need to track?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '28px' }}>
+              {docOptions.map(opt => (
+                <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', borderRadius: '10px', border: docNeeds.includes(opt.key) ? '2px solid #2b7cd3' : '1px solid rgba(255,255,255,0.12)', background: docNeeds.includes(opt.key) ? 'rgba(43,124,211,0.12)' : 'rgba(255,255,255,0.03)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={docNeeds.includes(opt.key)} onChange={() => toggleDoc(opt.key)} style={{ width: '18px', height: '18px', accentColor: '#2b7cd3' }} />
+                  <span style={{ color: 'white', fontSize: '14px' }}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+            <button onClick={saveStep0} disabled={!propertyCount || saving} style={{ width: '100%', padding: '14px', background: '#2b7cd3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: !propertyCount || saving ? 'not-allowed' : 'pointer', opacity: !propertyCount || saving ? 0.5 : 1 }}>
+              {saving ? 'Saving...' : 'Continue →'}
+            </button>
+          </div>
+          <p onClick={() => setStep(1)} style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', margin: 0 }}>Skip for now</p>
+        </div>
+      </div>
+    );
+  }
+
   const current = steps[step - 1];
   return (
     <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1 }}>
@@ -521,7 +592,17 @@ function AskAnythingWidget() {
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('Thinking...');
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!loading) return;
+    const msgs = ['Thinking...', 'Checking compliance rules...', 'Almost there...'];
+    let i = 0;
+    setLoadingMsg(msgs[0]);
+    const interval = setInterval(() => { i = (i + 1) % msgs.length; setLoadingMsg(msgs[i]); }, 2500);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const suggestions = [
     'What documents do I need for a Welsh tenancy?',
@@ -590,7 +671,7 @@ function AskAnythingWidget() {
       {loading && (
         <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '16px', height: '16px', border: '2px solid rgba(43,124,211,0.3)', borderTopColor: blue, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Thinking...</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>{loadingMsg}</p>
         </div>
       )}
 
@@ -1689,7 +1770,7 @@ function App() {
           email: user.email,
           full_name: user.user_metadata?.full_name || 'Landlord',
           subject: 'Your Landlord Mate trial has ended — your documents are safe',
-          message: `Your 14-day free trial has ended.\n\nDon't worry — your documents are safely stored and waiting for you.\n\nSubscribe from just £149/year to keep full access to:\n• All your stored compliance documents\n• Automatic expiry reminders\n• Agent sharing links\n• Letter templates and more\n\nLog in and choose a plan: https://app.thelandlordmate.com\n\nIf you have any questions, reply to this email — we're here to help.\n\nSupport: thelandlordmate@gmail.com\n\nThe Landlord Mate Team`
+          message: `Your 7-day free trial has ended.\n\nDon't worry — your documents are safely stored and waiting for you.\n\nSubscribe from just £149/year to keep full access to:\n• All your stored compliance documents\n• Automatic expiry reminders\n• Agent sharing links\n• Letter templates and more\n\nLog in and choose a plan: https://app.thelandlordmate.com\n\nIf you have any questions, reply to this email — we're here to help.\n\nSupport: thelandlordmate@gmail.com\n\nThe Landlord Mate Team`
         })
       }).catch(() => {});
     }
@@ -2404,6 +2485,7 @@ function App() {
     return (
       <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <OnboardingWizard
+          user={user}
           onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
           onAddProperty={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
         />
@@ -2419,7 +2501,7 @@ function App() {
           
           {/* Property photo */}
           {selectedProperty.photo_url ? (
-            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', aspectRatio: '16/6' }}>
+            <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', aspectRatio: isMobile ? '16/9' : '16/6' }}>
               <img src={selectedProperty.photo_url} alt={selectedProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }} />
               <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '6px' }}>
                 <label style={{ background: 'rgba(0,0,0,0.65)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
@@ -2702,7 +2784,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                    {doc.file_path && <button onClick={() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); window.open(data.publicUrl, '_blank'); }} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>👁 View</button>}
+                    {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
                     <button onClick={() => handleEditDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
@@ -2890,7 +2972,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                    {doc.file_path && <button onClick={() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); window.open(data.publicUrl, '_blank'); }} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>👁 View</button>}
+                    {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
                     <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
                 </div>
