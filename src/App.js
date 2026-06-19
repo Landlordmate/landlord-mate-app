@@ -324,7 +324,7 @@ function HomeScreenBanner({ onDismiss }) {
   );
 }
 
-function PaywallScreen({ user, onSubscribe, subscribing }) {
+function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
   const isMobile = useIsMobile();
   const [billing, setBilling] = useState('annual');
 
@@ -368,11 +368,14 @@ function PaywallScreen({ user, onSubscribe, subscribing }) {
   const getPriceId = (plan) => PRICE_IDS[plan.key];
 
   return (
-    <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+    <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }}>
+      {onClose && (
+        <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'rgba(255,255,255,0.08)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '50%', fontSize: '18px', cursor: 'pointer' }}>×</button>
+      )}
       <div style={{ width: '100%', maxWidth: '680px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
-          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
+          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>{onClose ? 'Choose your plan' : 'Your free trial has ended'}</h1>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 20px' }}>Choose a plan to keep managing your compliance documents</p>
 
           {/* Billing toggle */}
@@ -910,6 +913,7 @@ function App() {
   const [showHomeBanner, setShowHomeBanner] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [forcePaywall, setForcePaywall] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -1775,6 +1779,11 @@ function App() {
       }).catch(() => {});
     }
     return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
+  }
+
+  // Voluntary "Choose a plan" from Settings — still on trial, can dismiss
+  if (user && forcePaywall && !trialExpired) {
+    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} onClose={() => setForcePaywall(false)} />;
   }
 
   // AGENT DASHBOARD
@@ -3290,7 +3299,7 @@ function App() {
               <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{isSubscribed ? '✓ Active' : 'Trial'}</span>
             </div>
             {!isSubscribed && (
-              <button onClick={() => handleSubscribe(PRICE_IDS.starter)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
+              <button onClick={() => setForcePaywall(true)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
                 {subscribing ? 'Loading…' : 'Choose a plan'}
               </button>
             )}
