@@ -836,6 +836,7 @@ function App() {
   const [addressError, setAddressError] = useState('');
   const [screen, setScreen] = useState('login');
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [confirmDeleteProperty, setConfirmDeleteProperty] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [showUpload, setShowUpload] = useState(false);
   const [docType, setDocType] = useState(DOC_TYPES[0]);
@@ -1521,13 +1522,13 @@ function App() {
   };
 
   const handleDeleteProperty = async (propertyId, e) => {
-    e.stopPropagation();
-    if (!window.confirm('Delete this property and all its documents?')) return;
+    if (e) e.stopPropagation();
     await supabase.from('documents').delete().eq('property_id', propertyId);
     await supabase.from('properties').delete().eq('id', propertyId);
     const newProps = properties.filter(p => p.id !== propertyId);
     setProperties(newProps);
     await loadAllDocuments(newProps);
+    setConfirmDeleteProperty(null);
   };
 
   const handleSelectProperty = async (property) => {
@@ -2907,7 +2908,7 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
                   <button onClick={(e) => handleEditProperty(p, e)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
-                  <button onClick={(e) => handleDeleteProperty(p.id, e)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
+                  <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteProperty(p); }} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                 </div>
               </div>
             </div>
@@ -2958,6 +2959,22 @@ function App() {
           )}
           {!showAdd && <button onClick={() => setShowAdd(true)} style={{ ...primaryBtn, marginTop: '8px' }}>+ Add Property</button>}
         </div>
+
+        {confirmDeleteProperty && (
+          <div onClick={() => setConfirmDeleteProperty(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: navy, border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '28px', maxWidth: '400px', width: '100%' }}>
+              <p style={{ fontSize: '32px', margin: '0 0 12px', textAlign: 'center' }}>⚠️</p>
+              <h3 style={{ color: 'white', fontWeight: '800', fontSize: '18px', margin: '0 0 8px', textAlign: 'center' }}>Are you sure?</h3>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', textAlign: 'center', margin: '0 0 4px' }}>This will permanently delete</p>
+              <p style={{ color: 'white', fontWeight: '700', fontSize: '14px', textAlign: 'center', margin: '0 0 4px' }}>{confirmDeleteProperty.address_line_1}</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', textAlign: 'center', margin: '0 0 24px' }}>and every document stored against it. This cannot be undone.</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setConfirmDeleteProperty(null)} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => handleDeleteProperty(confirmDeleteProperty.id)} style={{ flex: 1, padding: '12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Yes, Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
       </AppShell>
     );
   }
