@@ -10,12 +10,12 @@ const blue = '#2b7cd3';
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 const PRICE_IDS = {
-  starter: 'price_1ThpMm6vahEFgcuGjzecKEm3',
-  pro: 'price_1ThpOV6vahEFgcuG2H1Yfl6V',
-  portfolio: 'price_1ThpQD6vahEFgcuGPyhVCk4z',
-  agent_starter: 'price_1TifdQ6vahEFgcuG85QGlksp',
-  agent_pro: 'price_1TifmS6vahEFgcuGR4ctmnZ0',
-  agent_portfolio: 'price_1Tifnq6vahEFgcuGppTEia34',
+  starter: { annual: 'price_1ThpMm6vahEFgcuGjzecKEm3', monthly: 'price_1TkBxO6vahEFgcuGqWLQobJp' },
+  pro: { annual: 'price_1ThpOV6vahEFgcuG2H1Yfl6V', monthly: 'price_1TkByF6vahEFgcuGOkEWeJXj' },
+  portfolio: { annual: 'price_1ThpQD6vahEFgcuGPyhVCk4z', monthly: 'price_1TkByv6vahEFgcuGZjem7E8V' },
+  agent_starter: { annual: 'price_1TifdQ6vahEFgcuG85QGlksp', monthly: 'price_1TkC0y6vahEFgcuGW7Vr3Wtt' },
+  agent_pro: { annual: 'price_1TifmS6vahEFgcuGR4ctmnZ0', monthly: 'price_1TkC1o6vahEFgcuG0PJeOQB8' },
+  agent_portfolio: { annual: 'price_1Tifnq6vahEFgcuGppTEia34', monthly: 'price_1TkC356vahEFgcuGP9uBN3Ul' },
 };
 
 const LANDLORD_DOC_TYPES = [
@@ -326,12 +326,14 @@ function HomeScreenBanner({ onDismiss }) {
 
 function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
   const isMobile = useIsMobile();
+  const [billing, setBilling] = useState('annual');
 
   const plans = [
     {
       key: 'starter',
       name: 'Starter',
       annualPrice: 149,
+      monthlyPrice: 14.90,
       properties: '1-3 properties',
       desc: 'Perfect for small landlords',
       color: blue,
@@ -340,6 +342,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
       key: 'pro',
       name: 'Pro',
       annualPrice: 299,
+      monthlyPrice: 29.90,
       properties: '4-10 properties',
       desc: 'Most popular',
       color: '#7c3aed',
@@ -349,13 +352,14 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
       key: 'portfolio',
       name: 'Portfolio',
       annualPrice: 499,
+      monthlyPrice: 49.90,
       properties: 'Unlimited properties',
       desc: 'Serious portfolio landlords',
       color: '#059669',
     },
   ];
 
-  const getPriceId = (plan) => PRICE_IDS[plan.key];
+  const getPriceId = (plan) => PRICE_IDS[plan.key][billing];
 
   return (
     <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }}>
@@ -368,6 +372,20 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
           <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>{onClose ? 'Choose your plan' : 'Your free trial has ended'}</h1>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 20px' }}>Choose a plan to keep managing your compliance documents</p>
 
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
+            <button
+              onClick={() => setBilling('monthly')}
+              style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: billing === 'monthly' ? 'white' : 'transparent', color: billing === 'monthly' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+            >Monthly</button>
+            <button
+              onClick={() => setBilling('annual')}
+              style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: billing === 'annual' ? 'white' : 'transparent', color: billing === 'annual' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+            >Annual</button>
+          </div>
+          {billing === 'annual' && (
+            <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>Save 2 months free with annual billing</p>
+          )}
+
           <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '8px' }}>
             <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>Your documents are safe — subscribe any time to keep access to everything you have uploaded.</p>
           </div>
@@ -375,15 +393,18 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
           {plans.map(plan => {
-            const displayPrice = `£${plan.annualPrice}`;
+            const displayPrice = billing === 'annual' ? `£${plan.annualPrice}` : `£${plan.monthlyPrice.toFixed(2)}`;
+            const period = billing === 'annual' ? '/year' : '/month';
+            const annualEquiv = billing === 'monthly' ? `£${plan.annualPrice}/yr if paid annually` : null;
 
             return (
               <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
                 {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
                 <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>
-                  {displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>/year</span>
+                  {displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{period}</span>
                 </p>
+                {annualEquiv && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: '2px 0 4px' }}>{annualEquiv}</p>}
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
                 <button
                   onClick={() => onSubscribe(getPriceId(plan))}
@@ -961,6 +982,7 @@ function App() {
   const [agentDemoMode, setAgentDemoMode] = useState(false);
   const [agentSearch, setAgentSearch] = useState('');
   const [agentScreen, setAgentScreen] = useState('dashboard');
+  const [agentBilling, setAgentBilling] = useState('annual');
   const [selectedAgentProperty, setSelectedAgentProperty] = useState(null);
   const [selectedAgentPropertyDocs, setSelectedAgentPropertyDocs] = useState([]);
   const [agentPropertyTab, setAgentPropertyTab] = useState('documents');
@@ -1857,27 +1879,48 @@ function App() {
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
               <h1 style={{ color: 'white', fontWeight: '900', fontSize: '28px', margin: '0 0 12px' }}>Your free trial has ended</h1>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 8px' }}>Choose an agent plan to keep managing your portfolio</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 16px' }}>Choose an agent plan to keep managing your portfolio</p>
+
+              <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => setAgentBilling('monthly')}
+                  style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: agentBilling === 'monthly' ? 'white' : 'transparent', color: agentBilling === 'monthly' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+                >Monthly</button>
+                <button
+                  onClick={() => setAgentBilling('annual')}
+                  style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', background: agentBilling === 'annual' ? 'white' : 'transparent', color: agentBilling === 'annual' ? navy : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}
+                >Annual</button>
+              </div>
+              {agentBilling === 'annual' && (
+                <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '700', margin: '0 0 12px' }}>Save 2 months free with annual billing</p>
+              )}
+
               <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', display: 'inline-block' }}>
                 <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>🔒 Your portfolio data is safe — subscribe any time to keep access.</p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
               {[
-                { key: 'agent_starter', name: 'Agent Starter', price: '£499', properties: 'Up to 50 properties', color: blue },
-                { key: 'agent_pro', name: 'Agent Pro', price: '£999', properties: 'Up to 200 properties', color: '#7c3aed', highlight: true },
-                { key: 'agent_portfolio', name: 'Agent Portfolio', price: '£1,999', properties: 'Unlimited properties', color: '#059669' },
-              ].map(plan => (
+                { key: 'agent_starter', name: 'Agent Starter', annualPrice: 499, monthlyPrice: 49.90, properties: 'Up to 50 properties', color: blue },
+                { key: 'agent_pro', name: 'Agent Pro', annualPrice: 999, monthlyPrice: 99.90, properties: 'Up to 200 properties', color: '#7c3aed', highlight: true },
+                { key: 'agent_portfolio', name: 'Agent Portfolio', annualPrice: 1999, monthlyPrice: 199.90, properties: 'Unlimited properties', color: '#059669' },
+              ].map(plan => {
+                const displayPrice = agentBilling === 'annual' ? `£${plan.annualPrice}` : `£${plan.monthlyPrice.toFixed(2)}`;
+                const period = agentBilling === 'annual' ? '/year' : '/month';
+                const annualEquiv = agentBilling === 'monthly' ? `£${plan.annualPrice}/yr if paid annually` : null;
+                return (
                 <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
                   {plan.highlight && <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#7c3aed', color: 'white', padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
                   <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
-                  <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{plan.price}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>/year</span></p>
+                  <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{period}</span></p>
+                  {annualEquiv && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: '2px 0 4px' }}>{annualEquiv}</p>}
                   <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
-                  <button onClick={() => handleSubscribe(PRICE_IDS[plan.key])} disabled={subscribing} style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}>
+                  <button onClick={() => handleSubscribe(PRICE_IDS[plan.key][agentBilling])} disabled={subscribing} style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}>
                     {subscribing ? 'Loading…' : `Choose ${plan.name}`}
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
               Secure payment via Stripe · Questions? <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue }}>thelandlordmate@gmail.com</a>
@@ -3492,7 +3535,7 @@ function App() {
           onDismissBanner={handleDismissBanner}
           trialDaysLeft={trialStatus.daysLeft}
           showTrialNudge={showTrialNudge}
-          onSubscribe={() => handleSubscribe(PRICE_IDS.starter)}
+          onSubscribe={() => handleSubscribe(PRICE_IDS.starter.annual)}
           onPrintReport={() => setShowPrintReport(true)}
           setSelectedProperty={(p) => handleSelectProperty(p)}
           handleSelectProperty={handleSelectProperty}
