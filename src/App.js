@@ -970,6 +970,8 @@ function App() {
   const [referralSource, setReferralSource] = useState('');
   const [agentData, setAgentData] = useState(null);
   const [agentLandlords, setAgentLandlords] = useState([]);
+  const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [resendingId, setResendingId] = useState(null);
   const [agentProperties, setAgentProperties] = useState([]);
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
@@ -1108,6 +1110,14 @@ function App() {
       const landlordIds = [...new Set(props.map(p => p.user_id))];
       setAgentLandlords(landlords.filter(l => landlordIds.includes(l.id)));
     }
+
+    // Load this agent's invitations (pending and recently accepted)
+    const { data: invites } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('agency_id', agentRecord.id)
+      .order('created_at', { ascending: false });
+    if (invites) setPendingInvitations(invites);
 
     // Load templates — seed defaults if none exist
     const { data: existingTemplates } = await supabase.from('templates').select('*').eq('agent_id', agentRecord.id);
@@ -1272,14 +1282,58 @@ function App() {
     if (!inviteLandlordEmail.trim()) return;
     setInviteSending(true);
     setInviteError('');
-    const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
+    const emailTrimmed = inviteLandlordEmail.trim().toLowerCase();
+
     try {
+      // Auto-fill: check if this landlord has been in the system before (any agency)
+      let landlordName = inviteLandlordName.trim();
+      if (!landlordName) {
+        const { data: priorInvite } = await supabase
+          .from('invitations')
+          .select('landlord_name')
+          .eq('landlord_email', emailTrimmed)
+          .not('landlord_name', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (priorInvite?.landlord_name) landlordName = priorInvite.landlord_name;
+      }
+
+      // Check for an existing pending invitation from this agency to this email
+      const { data: existingInvite } = await supabase
+        .from('invitations')
+        .select('id, token')
+        .eq('agency_id', user.id)
+        .eq('landlord_email', emailTrimmed)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      let token;
+      if (existingInvite) {
+        // Resend using the same token, just bump last_sent_at and count
+        token = existingInvite.token;
+        await supabase.from('invitations').update({
+          last_sent_at: new Date().toISOString(),
+          resend_count: (existingInvite.resend_count || 0) + 1,
+          landlord_name: landlordName || null,
+        }).eq('id', existingInvite.id);
+      } else {
+        const { data: newInvite, error: inviteInsertError } = await supabase
+          .from('invitations')
+          .insert([{ agency_id: user.id, landlord_email: emailTrimmed, landlord_name: landlordName || null }])
+          .select('token')
+          .single();
+        if (inviteInsertError) throw inviteInsertError;
+        token = newInvite.token;
+      }
+
+      const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
       const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: inviteLandlordEmail.trim(),
-          full_name: inviteLandlordName.trim() || 'there',
+          email: emailTrimmed,
+          full_name: landlordName || 'there',
           template: 'agent_invite',
           extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
         })
@@ -1304,13 +1358,13 @@ function App() {
     const invalidLines = [];
 
     for (const line of rawLines) {
-      const email = line.split(',')[0].trim();
+      const email = line.split(',')[0].trim().toLowerCase();
       if (!emailRegex.test(email)) {
         invalidLines.push(line);
-      } else if (seen.has(email.toLowerCase())) {
+      } else if (seen.has(email)) {
         // duplicate, skip silently
       } else {
-        seen.add(email.toLowerCase());
+        seen.add(email);
         validEmails.push(email);
       }
     }
@@ -1322,12 +1376,38 @@ function App() {
 
     setBulkSending(true);
     setBulkResults(null);
-    const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
     let sent = 0;
     const failedEmails = [];
 
     for (const email of validEmails) {
       try {
+        // Reuse existing pending invitation token if one exists, else create a new one
+        const { data: existingInvite } = await supabase
+          .from('invitations')
+          .select('id, token, resend_count')
+          .eq('agency_id', user.id)
+          .eq('landlord_email', email)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+        let token;
+        if (existingInvite) {
+          token = existingInvite.token;
+          await supabase.from('invitations').update({
+            last_sent_at: new Date().toISOString(),
+            resend_count: (existingInvite.resend_count || 0) + 1,
+          }).eq('id', existingInvite.id);
+        } else {
+          const { data: newInvite, error: insertErr } = await supabase
+            .from('invitations')
+            .insert([{ agency_id: user.id, landlord_email: email }])
+            .select('token')
+            .single();
+          if (insertErr) throw insertErr;
+          token = newInvite.token;
+        }
+
+        const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
         const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1352,6 +1432,37 @@ function App() {
       setBulkEmailsText('');
     }
   };
+
+  const handleResendInvitation = async (invitation) => {
+    setResendingId(invitation.id);
+    try {
+      await supabase.from('invitations').update({
+        last_sent_at: new Date().toISOString(),
+        resend_count: (invitation.resend_count || 0) + 1,
+      }).eq('id', invitation.id);
+
+      const inviteLink = `https://app.thelandlordmate.com?invite=${invitation.token}`;
+      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: invitation.landlord_email,
+          full_name: invitation.landlord_name || 'there',
+          template: 'agent_invite',
+          extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+        })
+      });
+
+      setPendingInvitations(prev => prev.map(inv => inv.id === invitation.id
+        ? { ...inv, last_sent_at: new Date().toISOString(), resend_count: (inv.resend_count || 0) + 1 }
+        : inv
+      ));
+    } catch (e) {
+      // silent fail on resend, button will just be clickable again
+    }
+    setResendingId(null);
+  };
+
 
 
 
@@ -1507,19 +1618,43 @@ function App() {
     if (authUser) {
       const { data: existing } = await supabase.from('users').select('id').eq('id', authUser.id).single();
       if (!existing) {
-        const agentCode = new URLSearchParams(window.location.search).get('agent');
+        const inviteToken = new URLSearchParams(window.location.search).get('invite');
+        const legacyAgentCode = new URLSearchParams(window.location.search).get('agent');
+        let resolvedAgentCode = null;
+
+        // Secure path — verify a genuine invitation token belongs to this email
+        if (inviteToken && accountType === 'landlord') {
+          const { data: invitation } = await supabase
+            .from('invitations')
+            .select('id, agency_id, landlord_email, status')
+            .eq('token', inviteToken)
+            .eq('status', 'pending')
+            .maybeSingle();
+
+          if (invitation && invitation.landlord_email.toLowerCase() === email.toLowerCase()) {
+            const { data: agencyRecord } = await supabase.from('users').select('agent_code').eq('id', invitation.agency_id).single();
+            resolvedAgentCode = agencyRecord?.agent_code || null;
+            await supabase.from('invitations').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invitation.id);
+          }
+        }
+
+        // Legacy fallback — old shared links without a secure token still work, just without verification
+        if (!resolvedAgentCode && legacyAgentCode) {
+          resolvedAgentCode = legacyAgentCode;
+        }
+
         const { error: insertError } = await supabase.from('users').insert([{ 
           id: authUser.id, 
           email: email, 
           account_type: accountType,
           agency_name: accountType === 'agent' ? agencyName : null,
           agent_code: accountType === 'agent' ? authUser.id.split('-')[0] : null,
-          referred_by_agent: agentCode || null,
+          referred_by_agent: resolvedAgentCode || null,
           referral_source: referralSource || null
         }]);
         // If landlord signed up via agent invite link, link their properties to agent
-        if (agentCode && accountType === 'landlord') {
-          await supabase.from('users').update({ referred_by_agent: agentCode }).eq('id', authUser.id);
+        if (resolvedAgentCode && accountType === 'landlord') {
+          await supabase.from('users').update({ referred_by_agent: resolvedAgentCode }).eq('id', authUser.id);
         }
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
@@ -2587,6 +2722,40 @@ function App() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Invitation status tracker */}
+          {pendingInvitations.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px 24px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 14px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📨 Invitations ({pendingInvitations.length})</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pendingInvitations.map(inv => {
+                  const isAccepted = inv.status === 'accepted';
+                  const daysSinceSent = Math.floor((Date.now() - new Date(inv.last_sent_at)) / (1000 * 60 * 60 * 24));
+                  const canResend = !isAccepted && daysSinceSent >= 0;
+                  return (
+                    <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ minWidth: '180px' }}>
+                        <p style={{ margin: 0, color: 'white', fontSize: '13px', fontWeight: '600' }}>{inv.landlord_name || inv.landlord_email}</p>
+                        {inv.landlord_name && <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{inv.landlord_email}</p>}
+                      </div>
+                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: isAccepted ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)', color: isAccepted ? '#22c55e' : '#eab308' }}>
+                        {isAccepted ? '✓ Signed Up' : `Pending${daysSinceSent > 0 ? ` · sent ${daysSinceSent}d ago` : ''}`}
+                      </span>
+                      {!isAccepted && (
+                        <button
+                          onClick={() => handleResendInvitation(inv)}
+                          disabled={resendingId === inv.id}
+                          style={{ padding: '6px 14px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: resendingId === inv.id ? 'not-allowed' : 'pointer' }}
+                        >
+                          {resendingId === inv.id ? 'Sending…' : '↻ Resend'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
