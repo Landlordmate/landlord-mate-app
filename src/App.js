@@ -419,7 +419,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
         </div>
 
         <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
-          Secure payment via Stripe · Cancel anytime · Questions? <a href="mailto:support@thelandlordmate.com" style={{ color: blue }}>support@thelandlordmate.com</a>
+          Secure payment via Stripe · Cancel anytime · Questions? <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue }}>thelandlordmate@gmail.com</a>
         </p>
       </div>
     </div>
@@ -1095,7 +1095,7 @@ function App() {
             email: user.email,
             full_name: user.user_metadata?.full_name || 'Landlord',
             subject: 'Welcome to The Landlord Mate — Subscription Confirmed',
-            message: `Thank you for subscribing to The Landlord Mate!\n\nYour ${planName} is now active. Here's what you can do:\n\n• Upload your compliance documents (Gas Safe, EICR, EPC etc)\n• Set expiry dates and get automatic reminders\n• Share documents with your letting agent instantly\n\nIf you need any help, reply to this email or visit our Help & FAQs section in the app.\n\nSupport: support@thelandlordmate.com (we respond within 24 hours)\n\nLog in here: https://app.thelandlordmate.com\n\nThank you for choosing The Landlord Mate.\n\nThe Landlord Mate Team`
+            message: `Thank you for subscribing to The Landlord Mate!\n\nYour ${planName} is now active. Here's what you can do:\n\n• Upload your compliance documents (Gas Safe, EICR, EPC etc)\n• Set expiry dates and get automatic reminders\n• Share documents with your letting agent instantly\n\nIf you need any help, reply to this email or visit our Help & FAQs section in the app.\n\nSupport: thelandlordmate@gmail.com (we respond within 24 hours)\n\nLog in here: https://app.thelandlordmate.com\n\nThank you for choosing The Landlord Mate.\n\nThe Landlord Mate Team`
           })
         }).catch(() => {});
       }
@@ -2134,7 +2134,7 @@ function App() {
           email: user.email,
           full_name: user.user_metadata?.full_name || 'Landlord',
           subject: 'Your Landlord Mate trial has ended — your documents are safe',
-          message: `Your 7-day free trial has ended.\n\nDon't worry — your documents are safely stored and waiting for you.\n\nSubscribe from just £149/year to keep full access to:\n• All your stored compliance documents\n• Automatic expiry reminders\n• Agent sharing links\n• Letter templates and more\n\nLog in and choose a plan: https://app.thelandlordmate.com\n\nIf you have any questions, reply to this email — we're here to help.\n\nSupport: support@thelandlordmate.com\n\nThe Landlord Mate Team`
+          message: `Your 7-day free trial has ended.\n\nDon't worry — your documents are safely stored and waiting for you.\n\nSubscribe from just £149/year to keep full access to:\n• All your stored compliance documents\n• Automatic expiry reminders\n• Agent sharing links\n• Letter templates and more\n\nLog in and choose a plan: https://app.thelandlordmate.com\n\nIf you have any questions, reply to this email — we're here to help.\n\nSupport: thelandlordmate@gmail.com\n\nThe Landlord Mate Team`
         })
       }).catch(() => {});
     }
@@ -2238,7 +2238,7 @@ function App() {
               })}
             </div>
             <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '24px' }}>
-              Secure payment via Stripe · Questions? <a href="mailto:support@thelandlordmate.com" style={{ color: blue }}>support@thelandlordmate.com</a>
+              Secure payment via Stripe · Questions? <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue }}>thelandlordmate@gmail.com</a>
             </p>
           </div>
         </div>
@@ -2591,7 +2591,7 @@ function App() {
         { q: 'What does the Work Queue show?', a: 'The Work Queue at the top of your dashboard shows properties that need immediate attention — expired certificates in red, documents expiring within 30 days in amber, and those expiring within 90 days in yellow.' },
         { q: 'Can landlords see my agent notes?', a: 'No — agent notes are completely private. Only you and other agents in your account can see notes added in the Notes tab. Landlords have no visibility of them.' },
         { q: 'How do I export my portfolio?', a: 'Click the Export CSV button on your dashboard. This downloads a spreadsheet of all your properties with their compliance status, health scores and next expiry dates.' },
-        { q: 'How do I get help?', a: 'Email support@thelandlordmate.com and we will respond within 24 hours Monday to Friday.' },
+        { q: 'How do I get help?', a: 'Email thelandlordmate@gmail.com and we will respond within 24 hours Monday to Friday.' },
       ];
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
@@ -2611,11 +2611,11 @@ function App() {
           <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
             <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '6px' }}>❓ Help & FAQs</h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '8px' }}>Everything you need to know about the agent portal.</p>
-            <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '700', marginBottom: '24px', display: 'block' }}>Email us at support@thelandlordmate.com →</a>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700', marginBottom: '24px', display: 'block' }}>Email us at thelandlordmate@gmail.com →</a>
             <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px' }}>
               <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📞 Support</p>
               <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>We respond within 24 hours, Monday to Friday.</p>
-              <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '700' }}>support@thelandlordmate.com</a>
+              <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700' }}>thelandlordmate@gmail.com</a>
             </div>
             {agentFaqs.map((faq, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px 24px', marginBottom: '10px' }}>
@@ -2691,7 +2691,7 @@ function App() {
             </div>
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Support</p>
-              <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>support@thelandlordmate.com</a>
+              <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate@gmail.com</a>
             </div>
           </div>
         </div>
@@ -3640,14 +3640,14 @@ function App() {
       { q: 'How do I upload a document?', a: 'Go to All Properties, click on a property, then click "+ Upload Document". Choose the document type, select your file, and set the expiry date. Your document will be stored securely and you\'ll receive automatic reminders before it expires.' },
       { q: 'How do automatic reminders work?', a: 'Once you upload a document with an expiry date, The Landlord Mate automatically sends you email reminders at 90, 60, 30, 14 and 7 days before it expires. You don\'t need to do anything — reminders are fully automatic.' },
       { q: 'How do I share documents with my letting agent?', a: 'Go to your property page and click "Generate Share Link". Send this link to your agent — they can view all your compliance documents without needing to create an account.' },
-      { q: 'How do I upgrade or change my plan?', a: 'Go to Settings and scroll to the Subscription section. You can upgrade your plan at any time. Contact us at support@thelandlordmate.com if you need help.' },
-      { q: 'How do I cancel my subscription?', a: 'Email us at support@thelandlordmate.com and we\'ll cancel your subscription immediately. Your documents will remain safely stored and accessible until the end of your billing period.' },
+      { q: 'How do I upgrade or change my plan?', a: 'Go to Settings and scroll to the Subscription section. You can upgrade your plan at any time. Contact us at thelandlordmate@gmail.com if you need help.' },
+      { q: 'How do I cancel my subscription?', a: 'Email us at thelandlordmate@gmail.com and we\'ll cancel your subscription immediately. Your documents will remain safely stored and accessible until the end of your billing period.' },
       { q: 'What happens to my documents if I cancel?', a: 'Your documents are never deleted. If you cancel and later resubscribe, everything will be exactly as you left it. We keep your data safe.' },
       { q: 'Can I use The Landlord Mate on my phone?', a: 'Yes! The Landlord Mate works on any device. On iPhone or Android you can add it to your home screen for a full app experience — look for the "Add to Home Screen" banner when you first log in.' },
       { q: 'What documents should I upload?', a: 'The key compliance documents are: Gas Safety Certificate (annual), EICR Electrical Report (every 5 years), EPC Energy Performance Certificate (every 10 years), HMO Licence (if applicable), Rent Smart Wales Licence (Wales only), and your Tenancy Agreement.' },
       { q: 'Is my data secure?', a: 'Yes. All data is stored in a secure UK-based database (Supabase, London region) with bank-level encryption. We never share your data with third parties. See our Security & Data page for full details.' },
       { q: 'I\'m a letting agent — how does the agent portal work?', a: 'Sign up and choose "I\'m a Letting Agent". You\'ll get a unique invitation link to share with your landlords. When they sign up via your link they automatically appear in your portfolio dashboard. You get full compliance visibility across all your managed properties.' },
-      { q: 'How do I get help?', a: 'Email us at support@thelandlordmate.com and we\'ll respond within 24 hours Monday to Friday. We\'re a small team and we genuinely care about helping you stay compliant.' },
+      { q: 'How do I get help?', a: 'Email us at thelandlordmate@gmail.com and we\'ll respond within 24 hours Monday to Friday. We\'re a small team and we genuinely care about helping you stay compliant.' },
     ];
 
     return (
@@ -3655,13 +3655,13 @@ function App() {
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', maxWidth: '800px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '22px', marginBottom: '6px' }}>❓ Help & FAQs</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '8px' }}>Got a question? We've got answers. Can't find what you need?</p>
-          <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '700', marginBottom: '24px', display: 'block' }}>Email us at support@thelandlordmate.com →</a>
+          <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700', marginBottom: '24px', display: 'block' }}>Email us at thelandlordmate@gmail.com →</a>
 
           {/* Contact box */}
           <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '14px', padding: '20px 24px', marginBottom: '28px' }}>
             <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📞 Customer Support</p>
             <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>We respond to all emails within 24 hours, Monday to Friday.</p>
-            <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '700' }}>support@thelandlordmate.com</a>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '700' }}>thelandlordmate@gmail.com</a>
           </div>
 
           {/* FAQs */}
@@ -3674,7 +3674,7 @@ function App() {
 
           <div style={{ marginTop: '24px', padding: '20px 24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', textAlign: 'center' }}>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 8px' }}>Still need help?</p>
-            <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>Email support@thelandlordmate.com</a>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>Email thelandlordmate@gmail.com</a>
           </div>
         </div>
       </AppShell>
@@ -3853,7 +3853,7 @@ function App() {
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUPPORT</p>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Need help?</p>
-            <a href="mailto:support@thelandlordmate.com" style={{ color: blue, fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>support@thelandlordmate.com</a>
+            <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '8px' }}>thelandlordmate@gmail.com</a>
             <a href="https://thelandlordmate.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate.com →</a>
           </div>
 
