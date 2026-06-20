@@ -978,6 +978,7 @@ function App() {
   const [inviteLandlordName, setInviteLandlordName] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
+  const [inviteError, setInviteError] = useState('');
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [agentDemoMode, setAgentDemoMode] = useState(false);
   const [agentSearch, setAgentSearch] = useState('');
@@ -1262,28 +1263,34 @@ function App() {
     }
   };
 
+
   const handleInviteLandlord = async () => {
     if (!inviteLandlordEmail.trim()) return;
     setInviteSending(true);
+    setInviteError('');
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
     try {
-      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: inviteLandlordEmail.trim(),
-          full_name: inviteLandlordName.trim() || 'Landlord',
-          subject: `${userRecord?.agency_name || 'Your letting agent'} has invited you to The Landlord Mate`,
-          message: `Dear ${inviteLandlordName.trim() || 'Landlord'},\n\n${userRecord?.agency_name || 'Your letting agent'} has invited you to join The Landlord Mate — a simple platform to store your compliance documents and share them with your agent automatically.\n\nClick the link below to create your free account:\n\n${inviteLink}\n\nOnce you sign up, your documents will automatically be visible to ${userRecord?.agency_name || 'your agent'} — no more chasing or emailing certificates.\n\nThe Landlord Mate Team\nthelandlordmate.com`
+          full_name: inviteLandlordName.trim() || 'there',
+          template: 'agent_invite',
+          extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
         })
       });
+      if (!res.ok) throw new Error('Email failed to send');
       setInviteSent(true);
       setInviteLandlordEmail('');
       setInviteLandlordName('');
       setTimeout(() => { setInviteSent(false); setShowInviteForm(false); }, 3000);
-    } catch(e) {}
+    } catch(e) {
+      setInviteError('Something went wrong sending that invite — please try again.');
+    }
     setInviteSending(false);
   };
+
 
   const handleBulkChase = async () => {
     if (selectedProperties.length === 0) return;
@@ -2493,6 +2500,7 @@ function App() {
                   {inviteSent ? '✓ Sent!' : inviteSending ? 'Sending...' : 'Send Invite'}
                 </button>
               </div>
+              {inviteError && <p style={{ margin: '0 0 8px', color: '#ef4444', fontSize: '12px', fontWeight: '600' }}>⚠ {inviteError}</p>}
               <p style={{ margin: 0, color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>They'll receive an email from The Landlord Mate with your invitation link and instructions to sign up.</p>
             </div>
           )}
