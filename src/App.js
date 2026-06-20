@@ -1494,7 +1494,11 @@ function App() {
   };
 
   const handleDeleteInvitation = async (invitationId) => {
-    await supabase.from('invitations').delete().eq('id', invitationId);
+    const { error } = await supabase.from('invitations').delete().eq('id', invitationId);
+    if (error) {
+      alert('Could not remove that invitation — please try again.');
+      return;
+    }
     setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
   };
 
