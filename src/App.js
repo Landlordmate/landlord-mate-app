@@ -979,6 +979,10 @@ function App() {
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [inviteError, setInviteError] = useState('');
+  const [showBulkInvite, setShowBulkInvite] = useState(false);
+  const [bulkEmailsText, setBulkEmailsText] = useState('');
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkResults, setBulkResults] = useState(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [agentDemoMode, setAgentDemoMode] = useState(false);
   const [agentSearch, setAgentSearch] = useState('');
@@ -1290,6 +1294,65 @@ function App() {
     }
     setInviteSending(false);
   };
+
+  const handleBulkInvite = async () => {
+    const rawLines = bulkEmailsText.split('\n').map(l => l.trim()).filter(Boolean);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const seen = new Set();
+    const validEmails = [];
+    const invalidLines = [];
+
+    for (const line of rawLines) {
+      const email = line.split(',')[0].trim();
+      if (!emailRegex.test(email)) {
+        invalidLines.push(line);
+      } else if (seen.has(email.toLowerCase())) {
+        // duplicate, skip silently
+      } else {
+        seen.add(email.toLowerCase());
+        validEmails.push(email);
+      }
+    }
+
+    if (validEmails.length === 0) {
+      setBulkResults({ sent: 0, failed: 0, invalidLines, failedEmails: [] });
+      return;
+    }
+
+    setBulkSending(true);
+    setBulkResults(null);
+    const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
+    let sent = 0;
+    const failedEmails = [];
+
+    for (const email of validEmails) {
+      try {
+        const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            full_name: 'there',
+            template: 'agent_invite',
+            extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+          })
+        });
+        if (!res.ok) throw new Error('failed');
+        sent++;
+      } catch (e) {
+        failedEmails.push(email);
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    setBulkResults({ sent, failed: failedEmails.length, invalidLines, failedEmails });
+    setBulkSending(false);
+    if (failedEmails.length === 0 && invalidLines.length === 0) {
+      setBulkEmailsText('');
+    }
+  };
+
 
 
   const handleBulkChase = async () => {
@@ -2486,7 +2549,46 @@ function App() {
             <button onClick={() => setShowInviteForm(!showInviteForm)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               ✉️ Invite by Email
             </button>
+            <button onClick={() => setShowBulkInvite(!showBulkInvite)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              📋 Bulk Invite
+            </button>
           </div>
+
+          {/* Bulk invite form */}
+          {showBulkInvite && (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '20px 24px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📋 Invite Multiple Landlords</p>
+              <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Paste one email address per line — copy straight from a spreadsheet if that's easier.</p>
+              <textarea
+                value={bulkEmailsText}
+                onChange={e => setBulkEmailsText(e.target.value)}
+                placeholder={"jane@example.com\njohn@example.com\nsarah@example.com"}
+                rows={6}
+                style={{ width: '100%', padding: '12px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: 'monospace', background: 'rgba(255,255,255,0.06)', color: 'white', resize: 'vertical', marginBottom: '12px', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={handleBulkInvite} disabled={bulkSending || !bulkEmailsText.trim()} style={{ padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: bulkSending ? 'not-allowed' : 'pointer', opacity: !bulkEmailsText.trim() ? 0.5 : 1 }}>
+                  {bulkSending ? 'Sending invites…' : 'Send All Invites'}
+                </button>
+                {bulkEmailsText.trim() && !bulkSending && (
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{bulkEmailsText.split('\n').filter(l => l.trim()).length} email{bulkEmailsText.split('\n').filter(l => l.trim()).length === 1 ? '' : 's'} ready</p>
+                )}
+              </div>
+              {bulkResults && (
+                <div style={{ marginTop: '14px', padding: '12px 16px', background: bulkResults.failed > 0 || bulkResults.invalidLines.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', border: `1px solid ${bulkResults.failed > 0 || bulkResults.invalidLines.length > 0 ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`, borderRadius: '8px' }}>
+                  <p style={{ margin: 0, color: bulkResults.failed > 0 || bulkResults.invalidLines.length > 0 ? '#ef4444' : '#22c55e', fontSize: '13px', fontWeight: '700' }}>
+                    ✓ {bulkResults.sent} invite{bulkResults.sent === 1 ? '' : 's'} sent successfully
+                  </p>
+                  {bulkResults.failed > 0 && (
+                    <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{bulkResults.failed} failed to send: {bulkResults.failedEmails.join(', ')}</p>
+                  )}
+                  {bulkResults.invalidLines.length > 0 && (
+                    <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{bulkResults.invalidLines.length} line{bulkResults.invalidLines.length === 1 ? '' : 's'} skipped — not valid email addresses: {bulkResults.invalidLines.join(', ')}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Invite by email form */}
           {showInviteForm && (
