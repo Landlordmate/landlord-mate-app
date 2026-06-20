@@ -973,6 +973,10 @@ function App() {
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [resendingId, setResendingId] = useState(null);
   const [nameAutoFilled, setNameAutoFilled] = useState(false);
+  const [showAgentAddProperty, setShowAgentAddProperty] = useState(false);
+  const [agentNewLandlordEmail, setAgentNewLandlordEmail] = useState('');
+  const [agentAddPropertySaving, setAgentAddPropertySaving] = useState(false);
+  const [agentAddPropertyError, setAgentAddPropertyError] = useState('');
   const [agentProperties, setAgentProperties] = useState([]);
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
@@ -1489,6 +1493,78 @@ function App() {
     setResendingId(null);
   };
 
+  const handleDeleteInvitation = async (invitationId) => {
+    await supabase.from('invitations').delete().eq('id', invitationId);
+    setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+  };
+
+  const handleAgentAddProperty = async () => {
+    if (addressResults.length === 0 && !newAddress.trim()) {
+      setAgentAddPropertyError('Please look up and select an address first.');
+      return;
+    }
+    if (!agentNewLandlordEmail.trim()) {
+      setAgentAddPropertyError("Please enter the landlord's email address.");
+      return;
+    }
+    setAgentAddPropertySaving(true);
+    setAgentAddPropertyError('');
+    const emailTrimmed = agentNewLandlordEmail.trim().toLowerCase();
+
+    try {
+      // Does this landlord already have an account?
+      const { data: existingLandlord } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', emailTrimmed)
+        .eq('account_type', 'landlord')
+        .maybeSingle();
+
+      const propertyRecord = {
+        user_id: existingLandlord ? existingLandlord.id : null,
+        pending_landlord_email: existingLandlord ? null : emailTrimmed,
+        added_by_agent_id: user.id,
+        address_line_1: newAddress,
+        property_type: newType,
+        country: newCountry,
+      };
+
+      const { error: insertError } = await supabase.from('properties').insert([propertyRecord]);
+      if (insertError) throw insertError;
+
+      // If the landlord doesn't have an account yet, send them a proper invite too
+      if (!existingLandlord) {
+        const { data: newInvite, error: inviteErr } = await supabase
+          .from('invitations')
+          .insert([{ agency_id: user.id, landlord_email: emailTrimmed }])
+          .select('token')
+          .single();
+        if (!inviteErr && newInvite) {
+          const inviteLink = `https://app.thelandlordmate.com?invite=${newInvite.token}`;
+          fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: emailTrimmed,
+              full_name: 'there',
+              template: 'agent_invite',
+              extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+            })
+          }).catch(() => {});
+        }
+      }
+
+      setShowAgentAddProperty(false);
+      setAgentNewLandlordEmail('');
+      setNewAddress(''); setNewPostcode(''); setAddressResults([]);
+      await loadAgentData(userRecord);
+    } catch (e) {
+      setAgentAddPropertyError('Something went wrong adding that property — please try again.');
+    }
+    setAgentAddPropertySaving(false);
+  };
+
+
 
 
 
@@ -1681,6 +1757,10 @@ function App() {
         // If landlord signed up via agent invite link, link their properties to agent
         if (resolvedAgentCode && accountType === 'landlord') {
           await supabase.from('users').update({ referred_by_agent: resolvedAgentCode }).eq('id', authUser.id);
+        }
+        // Claim any properties an agent added on this landlord's behalf before they signed up
+        if (accountType === 'landlord') {
+          await supabase.from('properties').update({ user_id: authUser.id, pending_landlord_email: null }).eq('pending_landlord_email', email.toLowerCase());
         }
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
@@ -2713,7 +2793,40 @@ function App() {
             <button onClick={() => setShowBulkInvite(!showBulkInvite)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               📋 Bulk Invite
             </button>
+            <button onClick={() => setShowAgentAddProperty(!showAgentAddProperty)} style={{ padding: '8px 16px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              🏠 Add Property for Landlord
+            </button>
           </div>
+
+          {/* Agent add property on behalf of landlord */}
+          {showAgentAddProperty && (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '14px', padding: '20px 24px', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>🏠 Add a Property on Behalf of a Landlord</p>
+              <p style={{ margin: '0 0 16px', color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>For landlords who'd rather you set things up for them. If they don't have an account yet, we'll invite them automatically and link this property the moment they sign up.</p>
+
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                <input type="text" placeholder="Postcode" value={newPostcode} onChange={e => setNewPostcode(e.target.value)} style={{ flex: 1, minWidth: '140px', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+                <button onClick={handleFindAddress} disabled={addressLoading} style={{ padding: '10px 18px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                  {addressLoading ? 'Looking…' : 'Find Address'}
+                </button>
+              </div>
+              {addressError && <p style={{ color: '#ef4444', fontSize: '12px', margin: '0 0 10px' }}>{addressError}</p>}
+              {addressResults.length > 0 && (
+                <select onChange={e => setNewAddress(e.target.value)} value={newAddress} style={{ width: '100%', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', marginBottom: '10px', boxSizing: 'border-box' }}>
+                  <option value="">Select address…</option>
+                  {addressResults.map((addr, i) => <option key={i} value={addr}>{addr}</option>)}
+                </select>
+              )}
+
+              <input type="email" placeholder="Landlord email address" value={agentNewLandlordEmail} onChange={e => setAgentNewLandlordEmail(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', marginBottom: '12px', boxSizing: 'border-box' }} />
+
+              {agentAddPropertyError && <p style={{ color: '#ef4444', fontSize: '12px', margin: '0 0 10px' }}>{agentAddPropertyError}</p>}
+
+              <button onClick={handleAgentAddProperty} disabled={agentAddPropertySaving} style={{ padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: agentAddPropertySaving ? 'not-allowed' : 'pointer' }}>
+                {agentAddPropertySaving ? 'Saving…' : 'Save Property'}
+              </button>
+            </div>
+          )}
 
           {/* Bulk invite form */}
           {showBulkInvite && (
@@ -2778,6 +2891,12 @@ function App() {
                           {resendingId === inv.id ? 'Sending…' : '↻ Resend'}
                         </button>
                       )}
+                      <button
+                        onClick={() => { if (window.confirm(`Remove this invitation to ${inv.landlord_email}?`)) handleDeleteInvitation(inv.id); }}
+                        style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
                     </div>
                   );
                 })}
