@@ -1551,8 +1551,8 @@ function App() {
             body: JSON.stringify({
               email: emailTrimmed,
               full_name: 'there',
-              template: 'agent_invite',
-              extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+              template: 'agent_added_property',
+              extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink, propertyAddress: newAddress },
             })
           }).catch(() => {});
         }
