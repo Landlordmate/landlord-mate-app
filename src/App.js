@@ -972,6 +972,31 @@ function App() {
   const [agentLandlords, setAgentLandlords] = useState([]);
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [resendingId, setResendingId] = useState(null);
+  const [nameAutoFilled, setNameAutoFilled] = useState(false);
+
+  useEffect(() => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const candidate = inviteLandlordEmail.trim().toLowerCase();
+    setNameAutoFilled(false);
+    if (!emailRegex.test(candidate) || inviteLandlordName.trim()) return;
+
+    const timer = setTimeout(async () => {
+      const { data: priorInvite } = await supabase
+        .from('invitations')
+        .select('landlord_name')
+        .eq('landlord_email', candidate)
+        .not('landlord_name', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (priorInvite?.landlord_name) {
+        setInviteLandlordName(priorInvite.landlord_name);
+        setNameAutoFilled(true);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [inviteLandlordEmail]);
   const [agentProperties, setAgentProperties] = useState([]);
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
@@ -2765,7 +2790,12 @@ function App() {
               <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>✉️ Invite a Landlord by Email</p>
               <p style={{ margin: '0 0 16px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Send your landlord a personalised invitation email with your unique link included.</p>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                <input type="text" placeholder="Landlord name (optional)" value={inviteLandlordName} onChange={e => setInviteLandlordName(e.target.value)} style={{ flex: 1, minWidth: '180px', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+                <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+                  <input type="text" placeholder="Landlord name (optional)" value={inviteLandlordName} onChange={e => { setInviteLandlordName(e.target.value); setNameAutoFilled(false); }} style={{ width: '100%', padding: '10px 14px', paddingRight: nameAutoFilled ? '110px' : '14px', border: `1px solid ${nameAutoFilled ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box', transition: 'border-color 0.3s' }} />
+                  {nameAutoFilled && (
+                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '12px', whiteSpace: 'nowrap' }}>✓ Known landlord</span>
+                  )}
+                </div>
                 <input type="email" placeholder="Landlord email address" value={inviteLandlordEmail} onChange={e => setInviteLandlordEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleInviteLandlord()} style={{ flex: 2, minWidth: '220px', padding: '10px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
                 <button onClick={handleInviteLandlord} disabled={inviteSending || !inviteLandlordEmail} style={{ padding: '10px 20px', background: inviteSent ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', opacity: !inviteLandlordEmail ? 0.5 : 1 }}>
                   {inviteSent ? '✓ Sent!' : inviteSending ? 'Sending...' : 'Send Invite'}
