@@ -973,6 +973,12 @@ function App() {
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [resendingId, setResendingId] = useState(null);
   const [nameAutoFilled, setNameAutoFilled] = useState(false);
+  const [agentProperties, setAgentProperties] = useState([]);
+  const [agentDocuments, setAgentDocuments] = useState([]);
+  const [agentFilter, setAgentFilter] = useState('all');
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteLandlordEmail, setInviteLandlordEmail] = useState('');
+  const [inviteLandlordName, setInviteLandlordName] = useState('');
 
   useEffect(() => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -997,12 +1003,7 @@ function App() {
 
     return () => clearTimeout(timer);
   }, [inviteLandlordEmail]);
-  const [agentProperties, setAgentProperties] = useState([]);
-  const [agentDocuments, setAgentDocuments] = useState([]);
-  const [agentFilter, setAgentFilter] = useState('all');
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [inviteLandlordEmail, setInviteLandlordEmail] = useState('');
-  const [inviteLandlordName, setInviteLandlordName] = useState('');
+
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [inviteError, setInviteError] = useState('');
