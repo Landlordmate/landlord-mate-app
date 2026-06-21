@@ -1083,6 +1083,7 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // Use the cached session immediately so the app loads fast...
         setUser(session.user);
         loadPropertiesForUser(session.user.id);
         loadUserRecord(session.user.id);
@@ -1090,6 +1091,11 @@ function App() {
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
+        // ...then quietly fetch the current, non-cached version in case
+        // anything (like display name) changed since this token was issued.
+        supabase.auth.getUser().then(({ data: { user: freshUser } }) => {
+          if (freshUser) setUser(freshUser);
+        });
       }
       setLoading(false);
     });
