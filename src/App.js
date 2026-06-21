@@ -1107,17 +1107,24 @@ function App() {
         setLoading(false);
         return;
       }
-      // Skip INITIAL_SESSION — the getSession()+getUser() combo above already
-      // handles page load. Acting on it here too caused a race condition where
-      // this stale event would silently overwrite freshly-saved profile changes
-      // (e.g. display name) right after they loaded correctly.
+      // Skip INITIAL_SESSION entirely — the getSession()+getUser() combo above
+      // already handles page load.
       if (event === 'INITIAL_SESSION') return;
-      if (session?.user && event !== 'PASSWORD_RECOVERY') {
-        setUser(session.user);
-        loadUserRecord(session.user.id);
+      if (session?.user) {
+        // IMPORTANT: never trust session.user's embedded metadata directly here.
+        // It can reflect a stale, locally-cached token snapshot (e.g. taken
+        // before a profile edit like display name), and Supabase can fire
+        // SIGNED_IN / TOKEN_REFRESHED on load depending on browser/session
+        // state — that previously caused saved changes to silently revert.
+        // Always re-fetch the authoritative current user from the server.
+        const sessionUserId = session.user.id;
+        loadUserRecord(sessionUserId);
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
+        supabase.auth.getUser().then(({ data: { user: freshUser } }) => {
+          if (freshUser) setUser(freshUser);
+        });
       }
     });
 
