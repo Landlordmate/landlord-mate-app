@@ -1107,6 +1107,11 @@ function App() {
         setLoading(false);
         return;
       }
+      // Skip INITIAL_SESSION — the getSession()+getUser() combo above already
+      // handles page load. Acting on it here too caused a race condition where
+      // this stale event would silently overwrite freshly-saved profile changes
+      // (e.g. display name) right after they loaded correctly.
+      if (event === 'INITIAL_SESSION') return;
       if (session?.user && event !== 'PASSWORD_RECOVERY') {
         setUser(session.user);
         loadUserRecord(session.user.id);
