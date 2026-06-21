@@ -3863,7 +3863,7 @@ function App() {
             </div>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Display name</p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="text" autoComplete="name" placeholder={user?.user_metadata?.full_name || 'Your name'} value={settingsName} onChange={(e) => setSettingsName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <input type="text" name="tlm_display_name_field" id="tlm_display_name_field" autoComplete="off" data-lpignore="true" data-form-type="other" placeholder={user?.user_metadata?.full_name || 'Your name'} value={settingsName} onChange={(e) => setSettingsName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
               <button onClick={handleSaveDisplayName} style={{ padding: '12px 16px', background: settingsNameSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 {settingsNameSaved ? '✓ Saved' : 'Save'}
               </button>
