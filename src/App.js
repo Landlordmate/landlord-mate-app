@@ -1083,6 +1083,7 @@ function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        console.log('[DEBUG] getSession returned full_name:', session.user.user_metadata?.full_name);
         // Use the cached session immediately so the app loads fast...
         setUser(session.user);
         loadPropertiesForUser(session.user.id);
@@ -1093,9 +1094,10 @@ function App() {
         }
         // ...then quietly fetch the current, non-cached version in case
         // anything (like display name) changed since this token was issued.
-        supabase.auth.getUser().then(({ data: { user: freshUser } }) => {
+        supabase.auth.getUser().then(({ data: { user: freshUser }, error: freshError }) => {
+          console.log('[DEBUG] getUser (initial load) returned full_name:', freshUser?.user_metadata?.full_name, 'error:', freshError);
           if (freshUser) setUser(freshUser);
-        });
+        }).catch(err => console.log('[DEBUG] getUser (initial load) THREW:', err));
       }
       setLoading(false);
     });
@@ -1110,6 +1112,7 @@ function App() {
       // Skip INITIAL_SESSION entirely — the getSession()+getUser() combo above
       // already handles page load.
       if (event === 'INITIAL_SESSION') return;
+      console.log('[DEBUG] onAuthStateChange fired with event:', event);
       if (session?.user) {
         // IMPORTANT: never trust session.user's embedded metadata directly here.
         // It can reflect a stale, locally-cached token snapshot (e.g. taken
@@ -1122,9 +1125,10 @@ function App() {
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
-        supabase.auth.getUser().then(({ data: { user: freshUser } }) => {
+        supabase.auth.getUser().then(({ data: { user: freshUser }, error: freshError }) => {
+          console.log('[DEBUG] getUser (onAuthStateChange) returned full_name:', freshUser?.user_metadata?.full_name, 'error:', freshError);
           if (freshUser) setUser(freshUser);
-        });
+        }).catch(err => console.log('[DEBUG] getUser (onAuthStateChange) THREW:', err));
       }
     });
 
@@ -3863,7 +3867,7 @@ function App() {
             </div>
             <p style={{ color: 'white', fontWeight: '700', margin: '0 0 8px', fontSize: '14px' }}>Display name</p>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="text" placeholder={user?.user_metadata?.full_name || 'Your name'} value={settingsName} onChange={(e) => setSettingsName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <input type="text" placeholder={(console.log('[DEBUG] Settings rendering with full_name:', user?.user_metadata?.full_name), user?.user_metadata?.full_name || 'Your name')} value={settingsName} onChange={(e) => setSettingsName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
               <button onClick={handleSaveDisplayName} style={{ padding: '12px 16px', background: settingsNameSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 {settingsNameSaved ? '✓ Saved' : 'Save'}
               </button>
