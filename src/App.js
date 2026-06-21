@@ -68,6 +68,17 @@ function getGreeting() {
   return 'Good evening';
 }
 
+// Tidies up display casing only (e.g. "MICHAEL GRAHAM YOUNG" -> "Michael Graham Young").
+// Never changes what's actually stored in the database, just how it's shown.
+function toDisplayCase(name) {
+  if (!name) return name;
+  // Leave short all-caps words alone (likely intentional acronyms, e.g. "MGY", "UK")
+  return name.split(' ').map(word => {
+    if (word.length <= 3 && word === word.toUpperCase()) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(' ');
+}
+
 const COMPLIANCE_WEIGHTS = {
   'Gas Safety Certificate': 25,
   'EICR (Electrical Report)': 20,
@@ -957,6 +968,7 @@ function App() {
   const [settingsEmailError, setSettingsEmailError] = useState('');
   const [settingsName, setSettingsName] = useState('');
   const [settingsNameSaved, setSettingsNameSaved] = useState(false);
+  const [settingsNameError, setSettingsNameError] = useState('');
   const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
   const [settingsNewPassword, setSettingsNewPassword] = useState('');
   const [settingsPasswordMsg, setSettingsPasswordMsg] = useState('');
@@ -1397,7 +1409,7 @@ function App() {
           email: emailTrimmed,
           full_name: landlordName || 'there',
           template: 'agent_invite',
-          extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+          extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink },
         })
       });
       if (!res.ok) throw new Error('Email failed to send');
@@ -1477,7 +1489,7 @@ function App() {
             email,
             full_name: 'there',
             template: 'agent_invite',
-            extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+            extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink },
           })
         });
         if (!res.ok) throw new Error('failed');
@@ -1511,7 +1523,7 @@ function App() {
           email: invitation.landlord_email,
           full_name: invitation.landlord_name || 'there',
           template: 'agent_invite',
-          extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink },
+          extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink },
         })
       });
 
@@ -1584,7 +1596,7 @@ function App() {
               email: emailTrimmed,
               full_name: 'there',
               template: 'agent_added_property',
-              extra: { agencyName: userRecord?.agency_name || 'Your letting agent', inviteLink, propertyAddress: newAddress },
+              extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink, propertyAddress: newAddress },
             })
           }).catch(() => {});
         }
@@ -1621,7 +1633,7 @@ function App() {
               email: landlord.email,
               full_name: landlord.full_name || 'Landlord',
               subject: `Action Required: Compliance documents needed for ${property.address_line_1}`,
-              message: `Your letting agent ${userRecord?.agency_name || ''} has flagged that compliance documents for ${property.address_line_1} need attention. Please log in to The Landlord Mate and update your certificates as soon as possible.`
+              message: `Your letting agent ${toDisplayCase(userRecord?.agency_name) || ''} has flagged that compliance documents for ${property.address_line_1} need attention. Please log in to The Landlord Mate and update your certificates as soon as possible.`
             })
           });
           sent++;
@@ -3782,11 +3794,15 @@ function App() {
 
   const handleSaveDisplayName = async () => {
     if (!settingsName.trim()) return;
+    setSettingsNameError('');
     const { data, error } = await supabase.auth.updateUser({ data: { full_name: settingsName.trim() } });
     if (!error) {
       if (data?.user) setUser(data.user);
       setSettingsNameSaved(true);
       setTimeout(() => setSettingsNameSaved(false), 3000);
+    } else {
+      console.error('Display name save error:', error);
+      setSettingsNameError(`Save failed: ${error.message || 'please try again.'}`);
     }
   };
 
@@ -3833,6 +3849,7 @@ function App() {
               </button>
             </div>
             <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', margin: '6px 0 0' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'} · {allDocuments.length} documents</p>
+            {settingsNameError && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>⚠ {settingsNameError}</p>}
           </div>
 
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
