@@ -3779,6 +3779,7 @@ function App() {
             { title: 'Written Occupation Contract', desc: 'Under the Renting Homes Act, landlords must provide a written occupation contract within 14 days of occupation.', urgent: true },
             { title: 'Deposit Protection', desc: 'Deposits must be protected in an approved scheme (TDS, DPS or MyDeposits) within 30 days and information provided to the occupant.', urgent: false },
             { title: 'Smoke & Carbon Monoxide Alarms', desc: 'Working smoke alarms on every floor and CO alarms in rooms with gas appliances.', urgent: false },
+            { title: 'Agent Licence Safeguards', desc: 'Licensed agents must also maintain client money protection, professional indemnity insurance, and redress scheme membership (TPO or Property Redress Scheme), on top of certificate compliance.', urgent: false, agentOnly: true },
           ].map((item, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${item.urgent ? 'rgba(43,124,211,0.3)' : 'rgba(255,255,255,0.07)'}`, padding: '18px 20px', borderRadius: '12px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
@@ -3788,6 +3789,7 @@ function App() {
                   {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '12px', fontWeight: '600', marginTop: '8px', display: 'inline-block' }}>Visit Rent Smart Wales →</a>}
                 </div>
                 {item.urgent && <span style={{ background: 'rgba(43,124,211,0.15)', color: blue, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>Wales</span>}
+                {item.agentOnly && <span style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>Agents</span>}
               </div>
             </div>
           ))}
