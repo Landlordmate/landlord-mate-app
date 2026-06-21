@@ -721,11 +721,27 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
 
   return (
     <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1, overflowY: 'auto' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 4px' }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
-        <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '13px' }}>
-          {actionNeeded.length > 0 ? `${actionNeeded.length} ${actionNeeded.length === 1 ? 'document needs' : 'documents need'} your attention` : 'All your documents are in order ✓'}
-        </p>
+      <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 4px' }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
+          <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '13px' }}>
+            {actionNeeded.length > 0 ? `${actionNeeded.length} ${actionNeeded.length === 1 ? 'document needs' : 'documents need'} your attention` : 'All your documents are in order ✓'}
+          </p>
+        </div>
+        {properties.length > 0 && (
+          <button
+            onClick={() => {
+              if (properties.length === 1) {
+                handleSelectProperty(properties[0]);
+              } else {
+                setScreen('properties');
+              }
+            }}
+            style={{ background: blue, color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+          >
+            🔗 Share with your agent
+          </button>
+        )}
       </div>
 
       {showHomeBanner && <HomeScreenBanner onDismiss={onDismissBanner} />}
@@ -1035,6 +1051,7 @@ function App() {
   const [logoSaved, setLogoSaved] = useState(false);
   const [landlordLogoUrl, setLandlordLogoUrl] = useState('');
   const [landlordLogoSaved, setLandlordLogoSaved] = useState(false);
+  const [landlordLogoError, setLandlordLogoError] = useState('');
   const [pendingLandlordLogo, setPendingLandlordLogo] = useState(null);
   const [pendingLandlordLogoPreview, setPendingLandlordLogoPreview] = useState('');
   const [pendingAgencyLogo, setPendingAgencyLogo] = useState(null);
@@ -1219,41 +1236,56 @@ function App() {
   };
 
   const handleLandlordLogoUpload = async (file) => {
-    if (!file) return;
+    if (!file) return false;
+    setLandlordLogoError('');
     const ext = file.name.split('.').pop();
-    const path = `landlord_${user.id}.${ext}`;
+    const path = `${user.id}-landlord.${ext}`;
     const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
     if (!error) {
       const { data } = supabase.storage.from('logos').getPublicUrl(path);
-      await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      const { error: dbError } = await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      if (dbError) {
+        console.error('Landlord logo DB update error:', dbError);
+        setLandlordLogoError('Saved the image but failed to update your profile. Please try again.');
+        return false;
+      }
       setLandlordLogoUrl(data.publicUrl);
       setLandlordLogoSaved(true);
       setTimeout(() => setLandlordLogoSaved(false), 3000);
+      return true;
+    } else {
+      console.error('Landlord logo upload error:', error);
+      setLandlordLogoError(`Upload failed: ${error.message || 'please try again.'}`);
+      return false;
     }
   };
 
   const handleLandlordLogoSelect = (file) => {
     if (!file) return;
+    setLandlordLogoError('');
     setPendingLandlordLogo(file);
     setPendingLandlordLogoPreview(URL.createObjectURL(file));
   };
 
   const handleLandlordLogoSave = async () => {
     if (!pendingLandlordLogo) return;
-    await handleLandlordLogoUpload(pendingLandlordLogo);
-    setPendingLandlordLogo(null);
-    setPendingLandlordLogoPreview('');
+    const success = await handleLandlordLogoUpload(pendingLandlordLogo);
+    if (success) {
+      setPendingLandlordLogo(null);
+      setPendingLandlordLogoPreview('');
+    }
   };
 
   const handleLandlordLogoRemove = async () => {
     const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
     for (const ext of extensions) {
-      await supabase.storage.from('logos').remove([`landlord_${user.id}.${ext}`]);
+      await supabase.storage.from('logos').remove([`${user.id}-landlord.${ext}`]);
     }
     await supabase.from('users').update({ logo_url: null }).eq('id', user.id);
     setLandlordLogoUrl('');
     setPendingLandlordLogo(null);
     setPendingLandlordLogoPreview('');
+    setLandlordLogoError('');
   };
 
   const handleAgencyLogoSelect = (file) => {
@@ -3825,6 +3857,7 @@ function App() {
               {pendingLandlordLogoPreview && <button onClick={() => { setPendingLandlordLogo(null); setPendingLandlordLogoPreview(''); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>}
             </div>
             {landlordLogoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>✓ Logo saved!</p>}
+            {landlordLogoError && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>{landlordLogoError}</p>}
           </div>
 
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>SUBSCRIPTION</p>
