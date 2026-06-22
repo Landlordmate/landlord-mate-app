@@ -946,6 +946,7 @@ function App() {
   const [tenancySaved, setTenancySaved] = useState(false);
   const [rentReviewDate, setRentReviewDate] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
+  const [purchasePriceSaved, setPurchasePriceSaved] = useState(false);
   const [showPrintReport, setShowPrintReport] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [letterProperty, setLetterProperty] = useState('');
@@ -3324,8 +3325,14 @@ function App() {
                   <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>£</span>
                   <input type="number" placeholder="0.00" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} style={{ ...inputStyle, marginBottom: 0, paddingLeft: '28px' }} />
                 </div>
-                <button onClick={async () => { await supabase.from('properties').update({ purchase_price: purchasePrice || null }).eq('id', selectedProperty.id); }} style={{ padding: '12px 16px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Save</button>
+                <button onClick={async () => {
+                  const { error } = await supabase.from('properties').update({ purchase_price: purchasePrice || null }).eq('id', selectedProperty.id);
+                  if (error) { alert(error.message); return; }
+                  setPurchasePriceSaved(true);
+                  setTimeout(() => setPurchasePriceSaved(false), 3000);
+                }} style={{ padding: '12px 16px', background: purchasePriceSaved ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>{purchasePriceSaved ? '✓ Saved' : 'Save'}</button>
               </div>
+              {purchasePriceSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '8px 0 0' }}>✓ Purchase price saved!</p>}
               {purchasePrice && expenses.length > 0 && (
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
