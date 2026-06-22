@@ -965,6 +965,9 @@ function App() {
   const [landlordDocType, setLandlordDocType] = useState(LANDLORD_DOC_TYPES[0]);
   const [landlordExpiryDate, setLandlordExpiryDate] = useState('');
   const [landlordUploadFile, setLandlordUploadFile] = useState(null);
+  const [scanningLandlordDoc, setScanningLandlordDoc] = useState(false);
+  const [landlordScanResult, setLandlordScanResult] = useState(null);
+  const [landlordScanError, setLandlordScanError] = useState('');
   const [landlordUploading, setLandlordUploading] = useState(false);
   const [settingsNewEmail, setSettingsNewEmail] = useState('');
   const [settingsEmailMsg, setSettingsEmailMsg] = useState('');
@@ -2144,6 +2147,43 @@ function App() {
     setShowUpload(false); setUploadFile(null); setExpiryDate(''); setDocType(DOC_TYPES[0]); setCustomDocType(''); setNoExpiry(false); setUploading(false); setScanResult(null); setScanError('');
   };
 
+  const handleScanLandlordDocument = async () => {
+    if (!landlordUploadFile) { alert('Please select a file first.'); return; }
+    setScanningLandlordDoc(true);
+    setLandlordScanError('');
+    setLandlordScanResult(null);
+    try {
+      const fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(landlordUploadFile);
+      });
+      const mimeType = landlordUploadFile.type || 'application/octet-stream';
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: landlordDocType }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setLandlordScanError(data.error || 'Could not scan this document. Please enter the details manually.');
+        setScanningLandlordDoc(false);
+        return;
+      }
+      setLandlordScanResult(data);
+      if (data.document_type && LANDLORD_DOC_TYPES.includes(data.document_type)) {
+        setLandlordDocType(data.document_type);
+      }
+      if (data.expiry_date) {
+        setLandlordExpiryDate(data.expiry_date);
+      }
+    } catch (e) {
+      setLandlordScanError('Could not scan this document. Please enter the details manually.');
+    }
+    setScanningLandlordDoc(false);
+  };
+
   const handleLandlordUpload = async () => {
     if (!landlordUploadFile) { alert('Please select a file.'); return; }
     setLandlordUploading(true);
@@ -2155,7 +2195,7 @@ function App() {
     if (dbError) { alert(dbError.message); setLandlordUploading(false); return; }
     const { data: updated } = await supabase.from('documents').select('*').eq('user_id', user.id).is('property_id', null);
     if (updated) setLandlordDocs(updated);
-    setShowLandlordUpload(false); setLandlordUploadFile(null); setLandlordExpiryDate(''); setLandlordDocType(LANDLORD_DOC_TYPES[0]); setLandlordUploading(false);
+    setShowLandlordUpload(false); setLandlordUploadFile(null); setLandlordExpiryDate(''); setLandlordDocType(LANDLORD_DOC_TYPES[0]); setLandlordUploading(false); setLandlordScanResult(null); setLandlordScanError('');
   };
 
   const handleDeleteLandlordDoc = async (docId) => {
@@ -3664,10 +3704,34 @@ function App() {
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(optional)</span></label>
               <input type="date" value={landlordExpiryDate} onChange={(e) => setLandlordExpiryDate(e.target.value)} style={inputStyle} />
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => setLandlordUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setLandlordUploadFile(e.target.files[0]); setLandlordScanResult(null); setLandlordScanError(''); }} style={{ ...inputStyle, padding: '8px' }} />
+
+              {landlordUploadFile && !landlordScanResult && (
+                <button onClick={handleScanLandlordDocument} disabled={scanningLandlordDoc} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningLandlordDoc ? 'default' : 'pointer', opacity: scanningLandlordDoc ? 0.7 : 1 }}>
+                  {scanningLandlordDoc ? '✨ Reading your document…' : '✨ Scan with AI — fill in the dates for me'}
+                </button>
+              )}
+
+              {landlordScanResult && (
+                <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                  <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
+                  {landlordScanResult.confidence === 'low' && (
+                    <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
+                  )}
+                  {landlordScanResult.notes && (
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{landlordScanResult.notes}</p>
+                  )}
+                </div>
+              )}
+              {landlordScanError && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                  <p style={{ margin: 0, color: '#f87171', fontSize: '12px', fontWeight: '600' }}>{landlordScanError}</p>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button onClick={handleLandlordUpload} disabled={landlordUploading} style={{ ...primaryBtn, flex: 1, opacity: landlordUploading ? 0.7 : 1 }}>{landlordUploading ? 'Uploading…' : 'Upload Document'}</button>
-                <button onClick={() => setShowLandlordUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowLandlordUpload(false); setLandlordScanResult(null); setLandlordScanError(''); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
           )}
