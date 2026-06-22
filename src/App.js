@@ -921,6 +921,9 @@ function App() {
   const [shareLink, setShareLink] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
+  const [editingLandlordDoc, setEditingLandlordDoc] = useState(null);
+  const [editLandlordDocType, setEditLandlordDocType] = useState('');
+  const [editLandlordExpiry, setEditLandlordExpiry] = useState('');
   const [propertyNotes, setPropertyNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
   const [todos, setTodos] = useState([]);
@@ -2219,6 +2222,15 @@ function App() {
     setDocuments(documents.map(d => d.id === editingDoc.id ? { ...d, expiry_date: editExpiry || null, document_type: editDocType } : d));
     await loadAllDocuments(properties);
     setEditingDoc(null);
+  };
+
+  const handleEditLandlordDoc = (doc) => { setEditingLandlordDoc(doc); setEditLandlordExpiry(doc.expiry_date || ''); setEditLandlordDocType(doc.document_type); };
+
+  const handleSaveLandlordEdit = async () => {
+    const { error } = await supabase.from('documents').update({ expiry_date: editLandlordExpiry || null, document_type: editLandlordDocType }).eq('id', editingLandlordDoc.id);
+    if (error) { alert(error.message); return; }
+    setLandlordDocs(landlordDocs.map(d => d.id === editingLandlordDoc.id ? { ...d, expiry_date: editLandlordExpiry || null, document_type: editLandlordDocType } : d));
+    setEditingLandlordDoc(null);
   };
 
   const inputStyle = { width: '100%', padding: '12px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '15px', fontFamily: font, boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', color: 'white' };
@@ -3687,12 +3699,28 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
                     {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+                    <button onClick={() => handleEditLandlordDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
                 </div>
               </div>
             );
           })}
+
+          {editingLandlordDoc && (
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.4)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Edit Document</h3>
+              <select value={editLandlordDocType} onChange={(e) => setEditLandlordDocType(e.target.value)} style={inputStyle}>
+                {LANDLORD_DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date</label>
+              <input type="date" value={editLandlordExpiry} onChange={(e) => setEditLandlordExpiry(e.target.value)} style={inputStyle} />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={handleSaveLandlordEdit} style={{ ...primaryBtn, flex: 1 }}>Save Changes</button>
+                <button onClick={() => setEditingLandlordDoc(null)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          )}
 
           {showLandlordUpload && (
             <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.3)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
