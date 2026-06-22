@@ -35,8 +35,18 @@ const DOC_TYPES = [
   'EPC (Energy Performance)',
   'HMO Licence',
   'Tenancy Agreement',
+  'Written Statement (Wales Occupation Contract)',
   'Deposit Certificate',
   'Rent Smart Wales Licence',
+  'Selective Licence',
+  'Smoke & Carbon Monoxide Alarms',
+  'Legionella Risk Assessment',
+  'PAT Test (Portable Appliance Testing)',
+  'Inventory & Check-In Report',
+  'Check-Out Report',
+  'Guarantor Agreement',
+  'Insurance Certificate',
+  'Fitness for Human Habitation',
   'Other'
 ];
 
