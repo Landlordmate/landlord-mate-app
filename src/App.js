@@ -547,10 +547,10 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
   return (
     <div style={{ width: '220px', minHeight: '100vh', background: '#0d1b2a', borderRight: '1px solid rgba(43,124,211,0.15)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(43,124,211,0.15)', cursor: 'pointer' }} onClick={() => setScreen('dashboard')}>
-        <img src={logo} alt="The Landlord Mate" style={{ height: '44px' }} />
+        <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
         {landlordLogoUrl && (
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
-            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '72px', objectFit: 'contain', display: 'block', maxWidth: '180px' }} />
+            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '80px', objectFit: 'contain', display: 'block', maxWidth: '180px' }} />
           </div>
         )}
       </div>
