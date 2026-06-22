@@ -909,6 +909,9 @@ function App() {
   const [confirmDeleteProperty, setConfirmDeleteProperty] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [showUpload, setShowUpload] = useState(false);
+  const [scanningDocument, setScanningDocument] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scanError, setScanError] = useState('');
   const [docType, setDocType] = useState(DOC_TYPES[0]);
   const [customDocType, setCustomDocType] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -2084,6 +2087,48 @@ function App() {
     setTimeout(() => setShareCopied(false), 3000);
   };
 
+  const handleScanDocument = async () => {
+    if (!uploadFile) { alert('Please select a file first.'); return; }
+    setScanningDocument(true);
+    setScanError('');
+    setScanResult(null);
+    try {
+      const fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(uploadFile);
+      });
+      const mimeType = uploadFile.type || 'application/octet-stream';
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: docType !== 'Other' ? docType : '' }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setScanError(data.error || 'Could not scan this document. Please enter the details manually.');
+        setScanningDocument(false);
+        return;
+      }
+      setScanResult(data);
+      // Pre-fill the form — the landlord still confirms/edits before saving, nothing is saved automatically.
+      if (data.document_type && DOC_TYPES.includes(data.document_type)) {
+        setDocType(data.document_type);
+      } else if (data.document_type) {
+        setDocType('Other');
+        setCustomDocType(data.document_type);
+      }
+      if (data.expiry_date) {
+        setNoExpiry(false);
+        setExpiryDate(data.expiry_date);
+      }
+    } catch (e) {
+      setScanError('Could not scan this document. Please enter the details manually.');
+    }
+    setScanningDocument(false);
+  };
+
   const handleUpload = async () => {
     if (!uploadFile) { alert('Please select a file.'); return; }
     setUploading(true);
@@ -2096,7 +2141,7 @@ function App() {
     if (dbError) { alert(dbError.message); setUploading(false); return; }
     const { data: updatedDocs } = await supabase.from('documents').select('*').eq('property_id', selectedProperty.id);
     if (updatedDocs) { setDocuments(updatedDocs); await loadAllDocuments(properties); }
-    setShowUpload(false); setUploadFile(null); setExpiryDate(''); setDocType(DOC_TYPES[0]); setCustomDocType(''); setNoExpiry(false); setUploading(false);
+    setShowUpload(false); setUploadFile(null); setExpiryDate(''); setDocType(DOC_TYPES[0]); setCustomDocType(''); setNoExpiry(false); setUploading(false); setScanResult(null); setScanError('');
   };
 
   const handleLandlordUpload = async () => {
@@ -3404,10 +3449,34 @@ function App() {
                 </>
               )}
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => setUploadFile(e.target.files[0])} style={{ ...inputStyle, padding: '8px' }} />
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setUploadFile(e.target.files[0]); setScanResult(null); setScanError(''); }} style={{ ...inputStyle, padding: '8px' }} />
+
+              {uploadFile && !scanResult && (
+                <button onClick={handleScanDocument} disabled={scanningDocument} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningDocument ? 'default' : 'pointer', opacity: scanningDocument ? 0.7 : 1 }}>
+                  {scanningDocument ? '✨ Reading your document…' : '✨ Scan with AI — fill in the dates for me'}
+                </button>
+              )}
+
+              {scanResult && (
+                <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                  <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
+                  {scanResult.confidence === 'low' && (
+                    <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
+                  )}
+                  {scanResult.notes && (
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{scanResult.notes}</p>
+                  )}
+                </div>
+              )}
+              {scanError && (
+                <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
+                  <p style={{ margin: 0, color: '#f87171', fontSize: '12px', fontWeight: '600' }}>{scanError}</p>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button onClick={handleUpload} disabled={uploading} style={{ ...primaryBtn, flex: 1, opacity: uploading ? 0.7 : 1 }}>{uploading ? 'Uploading…' : 'Upload Document'}</button>
-                <button onClick={() => setShowUpload(false)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowUpload(false); setScanResult(null); setScanError(''); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
           )}
