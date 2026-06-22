@@ -2526,7 +2526,7 @@ function App() {
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')}>← Back</span>
               <span style={{ color: 'white', fontWeight: '700', fontSize: '14px' }}>{selectedAgentProperty.address_line_1}</span>
             </div>
@@ -2703,8 +2703,8 @@ function App() {
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2767,8 +2767,8 @@ function App() {
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2803,8 +2803,8 @@ function App() {
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -2874,8 +2874,8 @@ function App() {
         {/* Header with nav */}
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '64px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
-            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain' }} />}
+            <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
             <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
