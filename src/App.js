@@ -1032,6 +1032,8 @@ function App() {
   const [showHomeBanner, setShowHomeBanner] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState('');
   const [forcePaywall, setForcePaywall] = useState(false);
 
   useEffect(() => {
@@ -1757,6 +1759,34 @@ function App() {
     } catch (e) {
       alert('Something went wrong. Please try again.');
       setSubscribing(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalError('');
+    setPortalLoading(true);
+    try {
+      const customerId = userRecord?.stripe_customer_id;
+      if (!customerId) {
+        setPortalError('No billing account found yet. Please contact support if this seems wrong.');
+        setPortalLoading(false);
+        return;
+      }
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ customerId })
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setPortalError('Something went wrong opening billing settings. Please try again.');
+        setPortalLoading(false);
+      }
+    } catch (e) {
+      setPortalError('Something went wrong opening billing settings. Please try again.');
+      setPortalLoading(false);
     }
   };
 
@@ -3927,7 +3957,7 @@ function App() {
       { q: 'How do automatic reminders work?', a: 'Once you upload a document with an expiry date, The Landlord Mate automatically sends you email reminders at 90, 60, 30, 14 and 7 days before it expires. You don\'t need to do anything — reminders are fully automatic.' },
       { q: 'How do I share documents with my letting agent?', a: 'Go to your property page and click "Generate Share Link". Send this link to your agent — they can view all your compliance documents without needing to create an account.' },
       { q: 'How do I upgrade or change my plan?', a: 'Go to Settings and scroll to the Subscription section. You can upgrade your plan at any time. Contact us at thelandlordmate@gmail.com if you need help.' },
-      { q: 'How do I cancel my subscription?', a: 'Email us at thelandlordmate@gmail.com and we\'ll cancel your subscription immediately. Your documents will remain safely stored and accessible until the end of your billing period.' },
+      { q: 'How do I cancel my subscription?', a: 'Go to Settings and click "Manage subscription" to cancel any time through our secure billing portal. Your documents will remain safely stored and accessible until the end of your current billing period.' },
       { q: 'What happens to my documents if I cancel?', a: 'Your documents are never deleted. If you cancel and later resubscribe, everything will be exactly as you left it. We keep your data safe.' },
       { q: 'Can I use The Landlord Mate on my phone?', a: 'Yes! The Landlord Mate works on any device. On iPhone or Android you can add it to your home screen for a full app experience — look for the "Add to Home Screen" banner when you first log in.' },
       { q: 'What documents should I upload?', a: 'The key compliance documents are: Gas Safety Certificate (annual), EICR Electrical Report (every 5 years), EPC Energy Performance Certificate (every 10 years), HMO Licence (if applicable), Rent Smart Wales Licence (Wales only), and your Tenancy Agreement.' },
@@ -4135,6 +4165,12 @@ function App() {
                 {subscribing ? 'Loading…' : 'Choose a plan'}
               </button>
             )}
+            {isSubscribed && (
+              <button onClick={handleManageSubscription} disabled={portalLoading} style={{ marginTop: '14px', padding: '10px 20px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: portalLoading ? 0.7 : 1 }}>
+                {portalLoading ? 'Loading…' : 'Manage subscription'}
+              </button>
+            )}
+            {portalError && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700', margin: '10px 0 0' }}>⚠ {portalError}</p>}
           </div>
 
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
