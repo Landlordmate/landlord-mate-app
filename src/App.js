@@ -345,7 +345,7 @@ function HomeScreenBanner({ onDismiss }) {
   );
 }
 
-function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
+function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
   const isMobile = useIsMobile();
   const [billing, setBilling] = useState('annual');
 
@@ -381,6 +381,13 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
   ];
 
   const getPriceId = (plan) => PRICE_IDS[plan.key][billing];
+  const isExpired = !onClose;
+  const lostFeatures = [
+    'Automatic certificate expiry reminders',
+    'Uploading new documents',
+    'Agent sharing links',
+    'AI document scanning and Ask Mate',
+  ];
 
   return (
     <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }}>
@@ -389,9 +396,35 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
       )}
       <div style={{ width: '100%', maxWidth: '680px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img src={logo} alt="The Landlord Mate" style={{ height: '56px', marginBottom: '20px' }} />
-          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>{onClose ? 'Choose your plan' : 'Your free trial has ended'}</h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 20px' }}>Choose a plan to keep managing your compliance documents</p>
+          <img src={logo} alt="The Landlord Mate" style={{ height: isMobile ? '72px' : '88px', marginBottom: '20px' }} />
+
+          {!isExpired && typeof daysLeft === 'number' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: '999px', padding: '6px 16px', marginBottom: '16px' }}>
+              <span style={{ fontSize: '14px' }}>⏰</span>
+              <span style={{ color: '#eab308', fontSize: '13px', fontWeight: '800' }}>
+                Your trial ends in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+              </span>
+            </div>
+          )}
+
+          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '24px' : '28px', margin: '0 0 12px' }}>
+            {isExpired ? 'Your free trial has ended' : "Don't lose your compliance protection"}
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '15px', margin: '0 0 20px' }}>
+            {isExpired
+              ? 'Choose a plan to get back into your documents and reminders'
+              : 'Pick a plan now and keep everything running without a gap'}
+          </p>
+
+          <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '16px 20px', marginBottom: '20px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', fontWeight: '800', letterSpacing: '1px', margin: '0 0 10px' }}>WITHOUT A PLAN, YOU'LL LOSE</p>
+            {lostFeatures.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: i === lostFeatures.length - 1 ? 0 : '8px' }}>
+                <span style={{ color: '#f97316', fontSize: '14px', lineHeight: '20px' }}>✕</span>
+                <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', lineHeight: '20px' }}>{f}</span>
+              </div>
+            ))}
+          </div>
 
           <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '4px', marginBottom: '16px' }}>
             <button
@@ -408,7 +441,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose }) {
           )}
 
           <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '8px' }}>
-            <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>Your documents are safe — subscribe any time to keep access to everything you have uploaded.</p>
+            <p style={{ color: '#22c55e', fontSize: '13px', margin: 0, fontWeight: '600' }}>Your documents are safe and stored. Subscribe any time to switch reminders and uploads back on.</p>
           </div>
         </div>
 
@@ -2314,7 +2347,7 @@ function App() {
 
   // Voluntary "Choose a plan" from Settings — still on trial, can dismiss
   if (user && forcePaywall && !trialExpired) {
-    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} onClose={() => setForcePaywall(false)} />;
+    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} onClose={() => setForcePaywall(false)} daysLeft={trialStatus.daysLeft} />;
   }
 
   // AGENT DASHBOARD
