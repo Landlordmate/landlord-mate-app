@@ -1142,7 +1142,7 @@ function App() {
         // Use the cached session immediately so the app loads fast...
         setUser(session.user);
         loadPropertiesForUser(session.user.id);
-        loadUserRecord(session.user.id);
+        loadUserRecord(session.user.id, session.user);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
@@ -1174,7 +1174,7 @@ function App() {
         // state — that previously caused saved changes to silently revert.
         // Always re-fetch the authoritative current user from the server.
         const sessionUserId = session.user.id;
-        loadUserRecord(sessionUserId);
+        loadUserRecord(sessionUserId, session.user);
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
@@ -1207,7 +1207,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadUserRecord = async (userId) => {
+  const loadUserRecord = async (userId, authUser) => {
     const { data } = await supabase.from('users').select('*').eq('id', userId).single();
     if (data) {
       setUserRecord(data);
@@ -1215,6 +1215,36 @@ function App() {
       if (data.account_type === 'agent') {
         loadAgentData(data);
       }
+      if (!data.welcome_email_sent) {
+        sendWelcomeEmailOnce(data, authUser);
+      }
+    }
+  };
+
+  const sendWelcomeEmailOnce = async (userRow, authUser) => {
+    // Mark as sent immediately so a second loadUserRecord call firing
+    // moments later (getSession + onAuthStateChange both fire on first
+    // load) can't trigger a duplicate send.
+    await supabase.from('users').update({ welcome_email_sent: true }).eq('id', userRow.id);
+    const fullName = authUser?.user_metadata?.full_name || userRow.agency_name || 'there';
+    if (userRow.account_type === 'agent') {
+      const inviteLink = `https://app.thelandlordmate.com?agent=${userRow.agent_code}`;
+      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userRow.email,
+          full_name: userRow.agency_name || fullName,
+          subject: `Welcome to The Landlord Mate Agent Portal`,
+          message: `Your agent dashboard is ready at app.thelandlordmate.com\n\nHere's how to get started:\n\n1. Share your landlord invitation link with your clients:\n${inviteLink}\n\n2. When they sign up via your link they automatically appear in your portfolio\n\n3. View their compliance status, send messages and download reports from your dashboard\n\nIf you have any questions just reply to this email.\n\nThe Landlord Mate Team`
+        })
+      }).catch(() => {});
+    } else {
+      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userRow.email, full_name: fullName })
+      }).catch(() => {});
     }
   };
 
@@ -1846,7 +1876,7 @@ function App() {
     if (data.user) {
       setUser(data.user);
       await loadPropertiesForUser(data.user.id);
-      await loadUserRecord(data.user.id);
+      await loadUserRecord(data.user.id, data.user);
       setScreen('dashboard');
       if (!localStorage.getItem('tlm_home_banner_dismissed')) {
         setShowHomeBanner(true);
@@ -1915,30 +1945,9 @@ function App() {
         if (insertError) { setError(insertError.message); setLoading(false); return; }
       }
 
-      if (accountType === 'agent') {
-        const agentCode = new URLSearchParams(window.location.search).get('agent') || authUser.id.split('-')[0];
-        const inviteLink = `https://app.thelandlordmate.com?agent=${agentCode}`;
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email,
-            full_name: agencyName || fullName,
-            subject: `Welcome to The Landlord Mate Agent Portal`,
-            message: `Your agent dashboard is ready at app.thelandlordmate.com\n\nHere's how to get started:\n\n1. Share your landlord invitation link with your clients:\n${inviteLink}\n\n2. When they sign up via your link they automatically appear in your portfolio\n\n3. View their compliance status, send messages and download reports from your dashboard\n\nIf you have any questions just reply to this email.\n\nThe Landlord Mate Team`
-          })
-        }).catch(() => {});
-      } else {
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email, full_name: fullName })
-        }).catch(() => {});
-      }
-
       if (data.session?.user) {
         setUser(data.session.user);
-        await loadUserRecord(data.session.user.id);
+        await loadUserRecord(data.session.user.id, data.session.user);
         if (accountType !== 'agent') setShowOnboarding(true);
         setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
