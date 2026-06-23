@@ -971,6 +971,7 @@ function App() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
+  const [propertyViewMode, setPropertyViewMode] = useState('tiles'); // 'tiles' or 'list'
   const [editPropertyAddress, setEditPropertyAddress] = useState('');
   const [editPropertyType, setEditPropertyType] = useState('house');
   const [editPropertyCountry, setEditPropertyCountry] = useState('Wales');
@@ -3560,7 +3561,13 @@ function App() {
       <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>All Properties</h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Click a property to manage its compliance documents.</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Click a property to manage its compliance documents.</p>
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px', flexShrink: 0 }}>
+              <button onClick={() => setPropertyViewMode('tiles')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'tiles' ? blue : 'transparent', color: propertyViewMode === 'tiles' ? 'white' : 'rgba(255,255,255,0.5)' }}>🔳 Tiles</button>
+              <button onClick={() => setPropertyViewMode('list')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'list' ? blue : 'transparent', color: propertyViewMode === 'list' ? 'white' : 'rgba(255,255,255,0.5)' }}>☰ List</button>
+            </div>
+          </div>
 
           {properties.length === 0 && !showAdd && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
@@ -3593,20 +3600,26 @@ function App() {
           )}
 
           {properties.map(p => (
-            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', marginBottom: '12px', cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.2s' }}
+            <div key={p.id} onClick={() => handleSelectProperty(p)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', marginBottom: '10px', cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.2s' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'}
               onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}>
-              {p.photo_url && (
+              {propertyViewMode === 'tiles' && p.photo_url && (
                 <div style={{ aspectRatio: '16/7', overflow: 'hidden', position: 'relative' }}>
                   <img src={p.photo_url} alt={p.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(13,27,42,0.8) 100%)' }} />
                 </div>
               )}
-              <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: propertyViewMode === 'list' ? '10px 14px' : '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                  {!p.photo_url && <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>}
+                  {(propertyViewMode === 'list' || !p.photo_url) && (
+                    <div style={{ width: propertyViewMode === 'list' ? '28px' : '36px', height: propertyViewMode === 'list' ? '28px' : '36px', borderRadius: '8px', overflow: 'hidden', background: 'rgba(43,124,211,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: propertyViewMode === 'list' ? '13px' : '16px', flexShrink: 0 }}>
+                      {propertyViewMode === 'list' && p.photo_url
+                        ? <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : '🏠'}
+                    </div>
+                  )}
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
+                    <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: propertyViewMode === 'list' ? '13px' : '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address_line_1}</p>
                     <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: '12px', textTransform: 'capitalize' }}>
                       {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>View →</span>
                     </p>
