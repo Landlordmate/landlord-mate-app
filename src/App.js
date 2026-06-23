@@ -396,7 +396,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       )}
       <div style={{ width: '100%', maxWidth: '680px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img src={logo} alt="The Landlord Mate" style={{ height: isMobile ? '72px' : '88px', marginBottom: '20px' }} />
+          <img src={logo} alt="The Landlord Mate" style={{ display: 'block', height: isMobile ? '72px' : '88px', margin: '0 auto 20px' }} />
 
           {!isExpired && typeof daysLeft === 'number' && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: '999px', padding: '6px 16px', marginBottom: '16px' }}>
