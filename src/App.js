@@ -2333,7 +2333,7 @@ function App() {
       <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+            <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Set new password</h1>
           {passwordResetDone ? (
@@ -4312,7 +4312,7 @@ function App() {
       <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+            <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>📧</div>
           <h1 style={{ color: '#0f1e30', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Check your email</h1>
@@ -4328,7 +4328,7 @@ function App() {
       <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+            <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Reset your password</h1>
           {forgotSent ? (
@@ -4359,7 +4359,7 @@ function App() {
       <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-            <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+            <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Create your account</h1>
           <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>Start your 7-day free trial</p>
@@ -4413,7 +4413,7 @@ function App() {
     <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div style={{ background: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', width: '100%', maxWidth: '400px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-          <img src={logo} alt="The Landlord Mate" style={{ height: '56px' }} />
+          <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
         </div>
         <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Sign in to your account</h1>
         {error && <p style={{ color: '#c62828', background: '#ffebee', padding: '10px 14px', borderRadius: '8px', fontSize: '14px' }}>{error}</p>}
