@@ -4229,7 +4229,7 @@ function App() {
           onDismissBanner={handleDismissBanner}
           trialDaysLeft={trialStatus.daysLeft}
           showTrialNudge={showTrialNudge}
-          onSubscribe={() => handleSubscribe(PRICE_IDS.starter.annual)}
+          onSubscribe={() => setForcePaywall(true)}
           onPrintReport={() => setShowPrintReport(true)}
           setSelectedProperty={(p) => handleSelectProperty(p)}
           handleSelectProperty={handleSelectProperty}
