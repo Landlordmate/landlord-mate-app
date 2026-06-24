@@ -1234,10 +1234,18 @@ function App() {
   };
 
   const sendWelcomeEmailOnce = async (userRow, authUser) => {
-    // Mark as sent immediately so a second loadUserRecord call firing
-    // moments later (getSession + onAuthStateChange both fire on first
-    // load) can't trigger a duplicate send.
-    await supabase.from('users').update({ welcome_email_sent: true }).eq('id', userRow.id);
+    // Atomic claim: only proceed if THIS call is the one that successfully flips
+    // the flag from false to true. If getSession and onAuthStateChange both fire
+    // near-simultaneously, only one of these updates will find a matching row
+    // (the other will already see welcome_email_sent = true and match nothing),
+    // so only one of them gets a row back and only one sends the email.
+    const { data: claimed } = await supabase
+      .from('users')
+      .update({ welcome_email_sent: true })
+      .eq('id', userRow.id)
+      .eq('welcome_email_sent', false)
+      .select();
+    if (!claimed || claimed.length === 0) return; // someone else already claimed it
     const fullName = authUser?.user_metadata?.full_name || userRow.agency_name || 'there';
     if (userRow.account_type === 'agent') {
       const inviteLink = `https://app.thelandlordmate.com?agent=${userRow.agent_code}`;
