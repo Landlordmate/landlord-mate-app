@@ -1059,6 +1059,16 @@ function App() {
   const [nameAutoFilled, setNameAutoFilled] = useState(false);
   const [showAgentAddProperty, setShowAgentAddProperty] = useState(false);
   const [agentNewLandlordEmail, setAgentNewLandlordEmail] = useState('');
+  const [showAgentUpload, setShowAgentUpload] = useState(false);
+  const [agentUploadFile, setAgentUploadFile] = useState(null);
+  const [agentDocType, setAgentDocType] = useState(DOC_TYPES[0]);
+  const [agentCustomDocType, setAgentCustomDocType] = useState('');
+  const [agentExpiryDate, setAgentExpiryDate] = useState('');
+  const [agentNoExpiry, setAgentNoExpiry] = useState(false);
+  const [agentUploading, setAgentUploading] = useState(false);
+  const [scanningAgentDocument, setScanningAgentDocument] = useState(false);
+  const [agentScanResult, setAgentScanResult] = useState(null);
+  const [agentScanError, setAgentScanError] = useState('');
   const [agentAddPropertySaving, setAgentAddPropertySaving] = useState(false);
   const [agentAddPropertyError, setAgentAddPropertyError] = useState('');
   const [agentProperties, setAgentProperties] = useState([]);
@@ -1316,6 +1326,97 @@ function App() {
     if (!newAgentNote.trim()) return;
     const { data } = await supabase.from('agent_notes').insert([{ property_id: selectedAgentProperty.id, agent_id: user.id, note: newAgentNote.trim() }]).select();
     if (data) { setAgentNotes([data[0], ...agentNotes]); setNewAgentNote(''); }
+  };
+
+  const handleScanAgentDocument = async () => {
+    if (!agentUploadFile) { alert('Please select a file first.'); return; }
+    setScanningAgentDocument(true);
+    setAgentScanError('');
+    setAgentScanResult(null);
+    try {
+      const fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(agentUploadFile);
+      });
+      const mimeType = agentUploadFile.type || 'application/octet-stream';
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: agentDocType !== 'Other' ? agentDocType : '' }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setAgentScanError(data.error || 'Could not scan this document. Please enter the details manually.');
+        setScanningAgentDocument(false);
+        return;
+      }
+      setAgentScanResult(data);
+      if (data.document_type && DOC_TYPES.includes(data.document_type)) {
+        setAgentDocType(data.document_type);
+      } else if (data.document_type) {
+        setAgentDocType('Other');
+        setAgentCustomDocType(data.document_type);
+      }
+      if (data.expiry_date) {
+        setAgentNoExpiry(false);
+        setAgentExpiryDate(data.expiry_date);
+      }
+    } catch (e) {
+      setAgentScanError('Could not scan this document. Please enter the details manually.');
+    }
+    setScanningAgentDocument(false);
+  };
+
+  const handleAgentUpload = async () => {
+    if (!agentUploadFile) { alert('Please select a file.'); return; }
+    setAgentUploading(true);
+    const fileExt = agentUploadFile.name.split('.').pop();
+    const filePath = `${selectedAgentProperty.user_id || 'pending'}/${selectedAgentProperty.id}/${Date.now()}.${fileExt}`;
+    const { error: storageError } = await supabase.storage.from('documents').upload(filePath, agentUploadFile);
+    if (storageError) { alert(storageError.message); setAgentUploading(false); return; }
+    const finalDocType = agentDocType === 'Other' && agentCustomDocType.trim() ? agentCustomDocType.trim() : agentDocType;
+    const { error: dbError } = await supabase.from('documents').insert([{
+      property_id: selectedAgentProperty.id,
+      user_id: selectedAgentProperty.user_id,
+      added_by_agent_id: user.id,
+      document_type: finalDocType,
+      file_path: filePath,
+      expiry_date: agentNoExpiry ? null : (agentExpiryDate || null),
+    }]);
+    if (dbError) { alert(dbError.message); setAgentUploading(false); return; }
+
+    const { data: updatedDocs } = await supabase.from('documents').select('*').eq('property_id', selectedAgentProperty.id);
+    if (updatedDocs) setSelectedAgentPropertyDocs(updatedDocs);
+
+    const landlord = agentLandlords.find(l => l.id === selectedAgentProperty.user_id);
+    if (landlord?.email) {
+      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: landlord.email,
+          full_name: landlord.full_name || 'there',
+          template: 'agent_uploaded_document',
+          extra: {
+            agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent',
+            propertyAddress: selectedAgentProperty.address_line_1,
+            docType: finalDocType,
+          },
+        })
+      }).catch(() => {});
+    }
+
+    setShowAgentUpload(false);
+    setAgentUploadFile(null);
+    setAgentExpiryDate('');
+    setAgentDocType(DOC_TYPES[0]);
+    setAgentCustomDocType('');
+    setAgentNoExpiry(false);
+    setAgentUploading(false);
+    setAgentScanResult(null);
+    setAgentScanError('');
   };
 
   const handleDeleteAgentNote = async (noteId) => {
@@ -2650,6 +2751,61 @@ function App() {
             {/* Documents tab */}
             {agentPropertyTab === 'documents' && (
               <div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                  <button onClick={() => setShowAgentUpload(!showAgentUpload)} style={{ padding: '10px 18px', background: showAgentUpload ? 'rgba(255,255,255,0.08)' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                    {showAgentUpload ? 'Cancel' : '+ Upload Document for Landlord'}
+                  </button>
+                </div>
+
+                {showAgentUpload && (
+                  <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(43,124,211,0.3)', padding: '24px', borderRadius: '12px', marginBottom: '16px' }}>
+                    <h3 style={{ color: 'white', marginTop: 0, fontWeight: '700', fontSize: '15px' }}>Upload Document</h3>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Document type</label>
+                    <select value={agentDocType} onChange={(e) => { setAgentDocType(e.target.value); setAgentCustomDocType(''); }} style={inputStyle}>
+                      {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {agentDocType === 'Other' && (
+                      <input type="text" placeholder="Enter document type…" value={agentCustomDocType} onChange={(e) => setAgentCustomDocType(e.target.value)} style={{ ...inputStyle, marginTop: '-4px' }} />
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <input type="checkbox" id="agentNoExpiry" checked={agentNoExpiry} onChange={(e) => { setAgentNoExpiry(e.target.checked); if (e.target.checked) setAgentExpiryDate(''); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                      <label htmlFor="agentNoExpiry" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>No expiry date (e.g. tenancy agreement, deposit cert)</label>
+                    </div>
+                    {!agentNoExpiry && (
+                      <>
+                        <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date</label>
+                        <input type="date" value={agentExpiryDate} onChange={(e) => setAgentExpiryDate(e.target.value)} style={inputStyle} />
+                      </>
+                    )}
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" onChange={(e) => { setAgentUploadFile(e.target.files[0]); setAgentScanResult(null); setAgentScanError(''); }} style={{ ...inputStyle, padding: '8px' }} />
+
+                    {agentUploadFile && !agentScanResult && (
+                      <button onClick={handleScanAgentDocument} disabled={scanningAgentDocument} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningAgentDocument ? 'default' : 'pointer', opacity: scanningAgentDocument ? 0.7 : 1 }}>
+                        {scanningAgentDocument ? '✨ Reading the document…' : '✨ Scan with AI — fill in the dates for me'}
+                      </button>
+                    )}
+
+                    {agentScanResult && (
+                      <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                        <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
+                        {agentScanResult.confidence === 'low' && (
+                          <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
+                        )}
+                      </div>
+                    )}
+                    {agentScanError && (
+                      <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '-4px', marginBottom: '12px' }}>{agentScanError}</p>
+                    )}
+
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginTop: '4px', marginBottom: '12px' }}>The landlord will get an email letting them know this was added on their behalf, so they can check it over.</p>
+
+                    <button onClick={handleAgentUpload} disabled={agentUploading} style={{ width: '100%', padding: '14px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: agentUploading ? 'default' : 'pointer', opacity: agentUploading ? 0.7 : 1 }}>
+                      {agentUploading ? 'Uploading…' : 'Save Document'}
+                    </button>
+                  </div>
+                )}
+
                 {selectedAgentPropertyDocs.length === 0 ? (
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '40px', textAlign: 'center' }}>
                     <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No documents uploaded yet</p>
