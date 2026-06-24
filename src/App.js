@@ -2883,9 +2883,9 @@ function App() {
     const navItems = [
       { id: 'dashboard', label: '📊 Dashboard' },
       { id: 'properties', label: '🏠 Properties' },
+      { id: 'landlords', label: '👤 Landlords' },
       { id: 'templates', label: '📝 Templates' },
       { id: 'settings', label: '⚙️ Settings' },
-      { id: 'faq', label: '❓ Help' },
       { id: 'faq', label: '❓ Help' },
     ];
 
@@ -3153,6 +3153,69 @@ function App() {
         </div>
       );
     }
+    if (agentScreen === 'landlords') {
+      const landlordsList = displayLandlords.map(l => {
+        const theirProperties = displayProperties.filter(p => p.user_id === l.id);
+        const theirDocs = displayProperties.length > 0 ? agentDocuments.filter(d => theirProperties.some(p => p.id === d.property_id)) : [];
+        const avgScore = theirProperties.length > 0
+          ? Math.round(theirProperties.reduce((sum, p) => sum + getHealthScoreD(p.id), 0) / theirProperties.length)
+          : null;
+        return { ...l, propertyCount: theirProperties.length, firstProperty: theirProperties[0], avgScore };
+      }).sort((a, b) => (a.full_name || a.email).localeCompare(b.full_name || b.email));
+
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => setAgentScreen('dashboard')} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+              <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={() => { setAgentScreen(n.id); if (n.id === 'properties') setSelectedAgentProperty(null); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+          <div style={{ padding: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: 0 }}>👤 Your Landlords</h1>
+              <button onClick={() => setShowAgentAddProperty(true) || setAgentScreen('properties')} style={{ padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>+ Add Landlord</button>
+            </div>
+
+            {landlordsList.length === 0 ? (
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '48px', textAlign: 'center' }}>
+                <p style={{ fontSize: '32px', margin: '0 0 12px' }}>👤</p>
+                <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No landlords linked yet</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Invite landlords or add a property on their behalf from the Properties tab to see them here.</p>
+              </div>
+            ) : (
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0', padding: '12px 20px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>LANDLORD</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>PROPERTIES</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>AVG SCORE</span>
+                  <span></span>
+                </div>
+                {landlordsList.map((l, i) => (
+                  <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0', padding: '14px 20px', borderBottom: i < landlordsList.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
+                    <div>
+                      <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{l.full_name || l.email}</p>
+                      {l.full_name && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{l.email}</p>}
+                    </div>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{l.propertyCount} {l.propertyCount === 1 ? 'property' : 'properties'}</p>
+                    <p style={{ margin: 0, color: l.avgScore === null ? 'rgba(255,255,255,0.3)' : getHealthColor(l.avgScore), fontSize: '13px', fontWeight: '700' }}>{l.avgScore === null ? '—' : `${l.avgScore}/100`}</p>
+                    <p onClick={() => { if (l.firstProperty) handleSelectAgentProperty(l.firstProperty); }} style={{ margin: 0, color: l.firstProperty ? blue : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: l.firstProperty ? 'pointer' : 'default' }}>{l.firstProperty ? 'View →' : '—'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (agentScreen === 'templates') {
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
