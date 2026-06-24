@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json();
+    const { email, address } = await req.json();
     if (!email) {
       return new Response(JSON.stringify({ error: "Email is required" }), {
         status: 400,
@@ -33,7 +33,18 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    return new Response(JSON.stringify({ id: data?.id || null }), {
+    let duplicateProperty = false;
+    if (data?.id && address) {
+      const { data: existing } = await supabaseAdmin
+        .from("properties")
+        .select("id")
+        .eq("user_id", data.id)
+        .ilike("address_line_1", address)
+        .maybeSingle();
+      duplicateProperty = !!existing;
+    }
+
+    return new Response(JSON.stringify({ id: data?.id || null, duplicateProperty }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

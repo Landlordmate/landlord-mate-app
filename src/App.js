@@ -2241,6 +2241,7 @@ function App() {
     const { error: insertError } = await supabase.from('users').insert([{
       id: authUser.id,
       email: userEmail,
+      full_name: meta.full_name || null,
       account_type: metaAccountType,
       agency_name: metaAccountType === 'agent' ? meta.agency_name : null,
       agent_code: metaAccountType === 'agent' ? authUser.id.split('-')[0] : null,
