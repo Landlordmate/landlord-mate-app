@@ -1074,6 +1074,10 @@ function App() {
   const [scanningAgentDocument, setScanningAgentDocument] = useState(false);
   const [agentScanResult, setAgentScanResult] = useState(null);
   const [agentScanError, setAgentScanError] = useState('');
+  const [agentEditingProperty, setAgentEditingProperty] = useState(false);
+  const [agentEditPropertyAddress, setAgentEditPropertyAddress] = useState('');
+  const [agentEditPropertyType, setAgentEditPropertyType] = useState('');
+  const [agentEditPropertyCountry, setAgentEditPropertyCountry] = useState('');
   const [agentAddPropertySaving, setAgentAddPropertySaving] = useState(false);
   const [agentAddPropertyError, setAgentAddPropertyError] = useState('');
   const [agentProperties, setAgentProperties] = useState([]);
@@ -1304,11 +1308,24 @@ function App() {
       setAgentDocuments(allDocs);
     }
 
-    // Match landlords to properties
-    const { data: landlords } = await supabase.from('users').select('*').eq('account_type', 'landlord');
-    if (landlords) {
-      const landlordIds = [...new Set(props.map(p => p.user_id))];
-      setAgentLandlords(landlords.filter(l => landlordIds.includes(l.id)));
+    // Match landlords to properties — checked via a secure server-side function,
+    // since RLS correctly blocks the agent's own session from reading other
+    // users' rows directly from the client.
+    const landlordIds = [...new Set(props.map(p => p.user_id).filter(Boolean))];
+    if (landlordIds.length > 0) {
+      try {
+        const landlordsRes = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/get-agent-landlords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+          body: JSON.stringify({ ids: landlordIds }),
+        });
+        const landlordsData = await landlordsRes.json();
+        setAgentLandlords(landlordsData?.landlords || []);
+      } catch (e) {
+        setAgentLandlords([]);
+      }
+    } else {
+      setAgentLandlords([]);
     }
 
     // Load this agent's invitations (pending and recently accepted)
@@ -1444,6 +1461,36 @@ function App() {
     setAgentUploading(false);
     setAgentScanResult(null);
     setAgentScanError('');
+  };
+
+  const handleAgentEditPropertyOpen = () => {
+    setAgentEditPropertyAddress(selectedAgentProperty.address_line_1);
+    setAgentEditPropertyType(selectedAgentProperty.property_type);
+    setAgentEditPropertyCountry(selectedAgentProperty.country || 'Wales');
+    setAgentEditingProperty(true);
+  };
+
+  const handleAgentSaveEditProperty = async () => {
+    if (!agentEditPropertyAddress.trim()) { alert('Address cannot be empty.'); return; }
+    const { error } = await supabase.from('properties').update({
+      address_line_1: agentEditPropertyAddress,
+      property_type: agentEditPropertyType,
+      country: agentEditPropertyCountry,
+    }).eq('id', selectedAgentProperty.id);
+    if (error) { alert(error.message); return; }
+    const updated = { ...selectedAgentProperty, address_line_1: agentEditPropertyAddress, property_type: agentEditPropertyType, country: agentEditPropertyCountry };
+    setSelectedAgentProperty(updated);
+    setAgentProperties(agentProperties.map(p => p.id === selectedAgentProperty.id ? updated : p));
+    setAgentEditingProperty(false);
+  };
+
+  const handleAgentDeleteProperty = async () => {
+    if (!window.confirm(`Remove ${selectedAgentProperty.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
+    await supabase.from('documents').delete().eq('property_id', selectedAgentProperty.id);
+    await supabase.from('properties').delete().eq('id', selectedAgentProperty.id);
+    setAgentProperties(agentProperties.filter(p => p.id !== selectedAgentProperty.id));
+    setSelectedAgentProperty(null);
+    setAgentScreen('properties');
   };
 
   const handleDeleteAgentNote = async (noteId) => {
@@ -2825,9 +2872,38 @@ function App() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div>
-                <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: '0 0 4px' }}>{selectedAgentProperty.address_line_1}</h1>
-                <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: '13px', textTransform: 'capitalize' }}>{selectedAgentProperty.property_type}{selectedAgentProperty.country ? ` · ${selectedAgentProperty.country}` : ''}</p>
+              <div style={{ flex: 1 }}>
+                {agentEditingProperty ? (
+                  <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '10px', padding: '16px', maxWidth: '420px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600' }}>Address</label>
+                    <input type="text" value={agentEditPropertyAddress} onChange={(e) => setAgentEditPropertyAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <select value={agentEditPropertyType} onChange={(e) => setAgentEditPropertyType(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }}>
+                        <option value="House">House</option>
+                        <option value="Flat">Flat</option>
+                        <option value="Bungalow">Bungalow</option>
+                        <option value="HMO">HMO</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <select value={agentEditPropertyCountry} onChange={(e) => setAgentEditPropertyCountry(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }}>
+                        {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={handleAgentSaveEditProperty} style={{ flex: 1, padding: '10px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Save</button>
+                      <button onClick={() => setAgentEditingProperty(false)} style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: '0 0 4px' }}>{selectedAgentProperty.address_line_1}</h1>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', margin: '0 0 8px', fontSize: '13px', textTransform: 'capitalize' }}>{selectedAgentProperty.property_type}{selectedAgentProperty.country ? ` · ${selectedAgentProperty.country}` : ''}</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={handleAgentEditPropertyOpen} style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>✏️ Edit</button>
+                      <button onClick={handleAgentDeleteProperty} style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🗑 Delete</button>
+                    </div>
+                  </>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button onClick={() => { const w = window.open('', '_blank'); const today = new Date().toLocaleDateString('en-GB'); w.document.write(`<html><head><title>Compliance Report - ${selectedAgentProperty.address_line_1}</title><style>body{font-family:Georgia,serif;padding:40px;max-width:800px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px;border-bottom:2px solid #0f1e30;padding-bottom:6px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#0f1e30;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}.green{color:#22c55e;font-weight:700}.red{color:#ef4444;font-weight:700}.amber{color:#eab308;font-weight:700}.footer{margin-top:40px;font-size:11px;color:#999;border-top:1px solid #e2e8f0;padding-top:12px}</style></head><body><h1>${selectedAgentProperty.address_line_1}</h1><p style="color:#666;font-size:13px">${selectedAgentProperty.property_type}${selectedAgentProperty.country ? ' · ' + selectedAgentProperty.country : ''} · Report generated ${today}</p><p style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 14px;border-radius:6px;font-size:13px">Compliance Health Score: <strong style="color:${propScore >= 80 ? '#22c55e' : propScore >= 50 ? '#eab308' : '#ef4444'}">${propScore}/100</strong></p><h2>Compliance Documents</h2><table><tr><th>Document</th><th>Expiry Date</th><th>Status</th><th>Days Remaining</th></tr>${selectedAgentPropertyDocs.map(doc => { const s = getExpiryStatus(doc.expiry_date); const cls = s?.type === 'good' ? 'green' : s?.type === 'expired' ? 'red' : 'amber'; return `<tr><td>${doc.document_type}</td><td>${doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-GB') : 'No date'}</td><td class="${cls}">${s?.label || 'No date set'}</td><td class="${cls}">${s?.label || '—'}</td></tr>`; }).join('')}</table><div class="footer">Generated by The Landlord Mate for ${userRecord?.agency_name || 'your agency'} · thelandlordmate.com · ${today}</div></body></html>`); w.print(); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
