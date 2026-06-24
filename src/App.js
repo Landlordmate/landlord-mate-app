@@ -4574,6 +4574,17 @@ function App() {
     for (const p of properties) await supabase.from('documents').delete().eq('property_id', p.id);
     await supabase.from('properties').delete().eq('user_id', user.id);
     await supabase.from('users').delete().eq('id', user.id);
+    try {
+      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch (e) {
+      // Even if this step fails, their data is already gone — don't block
+      // sign-out over it. Worth checking Supabase Auth occasionally for any
+      // orphaned identities this might leave behind.
+    }
     await supabase.auth.signOut();
     setUser(null); setProperties([]); setAllDocuments([]); setScreen('login');
   };
