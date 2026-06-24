@@ -1505,6 +1505,35 @@ function App() {
     }
   };
 
+  const handleQuickDeleteProperty = async (property, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove ${property.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
+    try {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-delete-property', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ propertyId: property.id, agentId: user.id }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        alert(result.error || 'Could not delete this property — please try again.');
+        return;
+      }
+      setAgentProperties(agentProperties.filter(p => p.id !== property.id));
+    } catch (e) {
+      alert('Could not delete this property — please try again.');
+    }
+  };
+
+  const handleQuickEditProperty = async (property, e) => {
+    e.stopPropagation();
+    await handleSelectAgentProperty(property);
+    setAgentEditPropertyAddress(property.address_line_1);
+    setAgentEditPropertyType(property.property_type);
+    setAgentEditPropertyCountry(property.country || 'Wales');
+    setAgentEditingProperty(true);
+  };
+
   const handleDeleteAgentNote = async (noteId) => {
     await supabase.from('agent_notes').delete().eq('id', noteId);
     setAgentNotes(agentNotes.filter(n => n.id !== noteId));
@@ -3580,7 +3609,7 @@ function App() {
                 const landlord = getLandlordD(property);
                 const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
                 return (
-                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
+                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 150px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <input type="checkbox" checked={selectedProperties.includes(property.id)} onChange={(e) => { e.stopPropagation(); setSelectedProperties(prev => e.target.checked ? [...prev, property.id] : prev.filter(id => id !== property.id)); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
@@ -3598,7 +3627,11 @@ function App() {
                     <div>
                       {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
                     </div>
-                    <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button onClick={(e) => handleQuickEditProperty(property, e)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>✏️</button>
+                      <button onClick={(e) => handleQuickDeleteProperty(property, e)} title="Delete" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>🗑</button>
+                      <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
+                    </div>
                   </div>
                 );
               })}
