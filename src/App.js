@@ -778,7 +778,10 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
     <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1, overflowY: 'auto' }}>
       <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 4px' }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: 0 }}>{getGreeting()}{userName ? `, ${userName}` : ''} 👋</h1>
+            <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>LANDLORD</span>
+          </div>
           <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '13px' }}>
             {actionNeeded.length > 0 ? `${actionNeeded.length} ${actionNeeded.length === 1 ? 'document needs' : 'documents need'} your attention` : 'All your documents are in order ✓'}
           </p>
