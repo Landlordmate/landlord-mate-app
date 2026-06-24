@@ -1284,8 +1284,13 @@ function App() {
     setAgentData(agentRecord);
     if (agentRecord.logo_url) setAgencyLogoUrl(agentRecord.logo_url);
 
-    // Load all properties with this agent's email
-    const { data: props } = await supabase.from('properties').select('*').eq('agent_email', agentRecord.email);
+    // Load all properties linked to this agent — either a landlord self-linked
+    // them by entering this agent's email, or this agent added the property
+    // directly on the landlord's behalf.
+    const { data: props } = await supabase
+      .from('properties')
+      .select('*')
+      .or(`agent_email.eq.${agentRecord.email},added_by_agent_id.eq.${agentRecord.id}`);
     if (!props) return;
     setAgentProperties(props);
 
@@ -1794,13 +1799,22 @@ function App() {
     setAgentAddPropertyMessage(null);
 
     try {
-      // Does this landlord already have an account?
-      const { data: existingLandlord } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', emailTrimmed)
-        .eq('account_type', 'landlord')
-        .maybeSingle();
+      // Does this landlord already have an account? Checked via a secure
+      // server-side function, since RLS correctly blocks the agent's own
+      // session from reading another user's row directly from the client.
+      let existingLandlord = null;
+      try {
+        const lookupRes = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/lookup-landlord', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+          body: JSON.stringify({ email: emailTrimmed }),
+        });
+        const lookupData = await lookupRes.json();
+        if (lookupData?.id) existingLandlord = { id: lookupData.id };
+      } catch (e) {
+        // If the lookup fails for any reason, fall through to the invite
+        // path below rather than blocking the whole add-property action.
+      }
 
       // Has this exact property already been added for this exact landlord?
       const { data: possibleDupes } = await supabase
