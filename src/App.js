@@ -1673,6 +1673,22 @@ function App() {
     }
   };
 
+  const handleAgentPropertyPhotoUpload = async (file, propertyId) => {
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = `property_${propertyId}.${ext}`;
+    const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from('logos').getPublicUrl(path);
+      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+      await supabase.from('properties').update({ photo_url: data.publicUrl }).eq('id', propertyId);
+      setAgentProperties(agentProperties.map(p => p.id === propertyId ? { ...p, photo_url: bustedUrl } : p));
+      if (selectedAgentProperty?.id === propertyId) {
+        setSelectedAgentProperty({ ...selectedAgentProperty, photo_url: bustedUrl });
+      }
+    }
+  };
+
 
   const handleInviteLandlord = async () => {
     if (!inviteLandlordEmail.trim()) return;
@@ -2921,11 +2937,23 @@ function App() {
           <div style={{ padding: '32px', maxWidth: '1000px', margin: '0 auto' }}>
             {/* Property header */}
             {/* Property photo */}
-            {selectedAgentProperty.photo_url && (
+            {selectedAgentProperty.photo_url ? (
               <div style={{ position: 'relative', marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', aspectRatio: isMobile ? '16/9' : '16/6' }}>
                 <img src={selectedAgentProperty.photo_url} alt={selectedAgentProperty.address_line_1} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center center' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, rgba(13,27,42,0.8) 100%)' }} />
+                <div style={{ position: 'absolute', bottom: '10px', right: '10px', display: 'flex', gap: '6px' }}>
+                  <label style={{ background: 'rgba(0,0,0,0.65)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                    📷 Change
+                    <input type="file" accept="image/*" onChange={e => handleAgentPropertyPhotoUpload(e.target.files[0], selectedAgentProperty.id)} style={{ display: 'none' }} />
+                  </label>
+                  <button onClick={async () => { await supabase.from('properties').update({ photo_url: null }).eq('id', selectedAgentProperty.id); setAgentProperties(agentProperties.map(p => p.id === selectedAgentProperty.id ? { ...p, photo_url: null } : p)); setSelectedAgentProperty({ ...selectedAgentProperty, photo_url: null }); }} style={{ background: 'rgba(239,68,68,0.8)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>🗑 Remove</button>
+                </div>
               </div>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '14px 16px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>
+                📷 Add a photo of this property
+                <input type="file" accept="image/*" onChange={e => handleAgentPropertyPhotoUpload(e.target.files[0], selectedAgentProperty.id)} style={{ display: 'none' }} />
+              </label>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
