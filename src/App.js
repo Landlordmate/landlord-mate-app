@@ -1893,17 +1893,25 @@ function App() {
       // server-side function, since RLS correctly blocks the agent's own
       // session from reading another user's row directly from the client.
       let existingLandlord = null;
+      let landlordAlreadyHasThisProperty = false;
       try {
         const lookupRes = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/lookup-landlord', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
-          body: JSON.stringify({ email: emailTrimmed }),
+          body: JSON.stringify({ email: emailTrimmed, address: newAddress }),
         });
         const lookupData = await lookupRes.json();
         if (lookupData?.id) existingLandlord = { id: lookupData.id };
+        landlordAlreadyHasThisProperty = !!lookupData?.duplicateProperty;
       } catch (e) {
         // If the lookup fails for any reason, fall through to the invite
         // path below rather than blocking the whole add-property action.
+      }
+
+      if (landlordAlreadyHasThisProperty) {
+        setAgentAddPropertyError('This landlord has already added this property themselves — no need to add it again.');
+        setAgentAddPropertySaving(false);
+        return;
       }
 
       // Has this exact property already been added for this exact landlord?
@@ -2314,6 +2322,11 @@ function App() {
 
   const handleSaveProperty = async () => {
     if (!newAddress) { alert('Please select an address.'); return; }
+    const alreadyExists = properties.some(p => (p.address_line_1 || '').toLowerCase().trim() === newAddress.toLowerCase().trim());
+    if (alreadyExists) {
+      alert('This property is already in your account — your agent may have already added it for you. Check your properties list.');
+      return;
+    }
     const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry, agent_email: newAgentEmail || null }]).select();
     if (error) { alert(error.message); return; }
     if (data) {
