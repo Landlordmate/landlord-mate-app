@@ -1960,6 +1960,16 @@ function App() {
 
       if (existingLandlord) {
         setAgentAddPropertyMessage({ type: 'success', text: `\u2713 Linked directly to ${emailTrimmed}'s existing account — it'll be waiting for them next time they log in. No invite needed.` });
+        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailTrimmed,
+            full_name: 'there',
+            template: 'agent_linked_existing_property',
+            extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', propertyAddress: newAddress },
+          })
+        }).catch(() => {});
       } else {
         // Reuse an existing pending invite for this landlord if one exists, rather than creating a duplicate
         const { data: existingInvite } = await supabase
