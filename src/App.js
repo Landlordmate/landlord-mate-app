@@ -1186,7 +1186,10 @@ function App() {
         // state — that previously caused saved changes to silently revert.
         // Always re-fetch the authoritative current user from the server.
         const sessionUserId = session.user.id;
+        setUser(session.user);
         loadUserRecord(sessionUserId, session.user);
+        loadPropertiesForUser(sessionUserId);
+        setScreen('dashboard');
         if (!localStorage.getItem('tlm_home_banner_dismissed')) {
           setShowHomeBanner(true);
         }
