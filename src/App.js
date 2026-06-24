@@ -2132,7 +2132,13 @@ function App() {
       referred_by_agent: resolvedAgentCode || null,
       referral_source: meta.referral_source || null,
     }]);
-    if (insertError) return null;
+    if (insertError) {
+      // Most likely a concurrent call (getSession + onAuthStateChange firing
+      // near-simultaneously) already created this row a moment ago — not a
+      // real failure. Fetch whatever's there now instead of giving up.
+      const { data: nowExists } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+      return nowExists || null;
+    }
 
     if (resolvedAgentCode && metaAccountType === 'landlord') {
       await supabase.from('users').update({ referred_by_agent: resolvedAgentCode }).eq('id', authUser.id);
