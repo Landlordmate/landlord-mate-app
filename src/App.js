@@ -629,6 +629,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
             {user?.email?.[0]?.toUpperCase()}
           </div>
           <div style={{ overflow: 'hidden' }}>
+            <span style={{ display: 'inline-block', background: 'rgba(43,124,211,0.2)', color: blue, padding: '1px 7px', borderRadius: '20px', fontSize: '9px', fontWeight: '700', marginBottom: '3px' }}>LANDLORD</span>
             <p style={{ margin: 0, color: 'white', fontSize: '12px', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'}</p>
           </div>
