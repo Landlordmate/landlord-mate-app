@@ -3454,7 +3454,7 @@ function App() {
               } },
               { label: 'Compliant', value: displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length, color: '#22c55e', sub: 'Health score 80+', screen: 'properties' },
               { label: 'Compliance %', value: displayProperties.length > 0 ? `${Math.round((displayProperties.filter(p => getHealthScoreD(p.id) >= 80).length / displayProperties.length) * 100)}%` : '—', color: '#a78bfa', sub: 'Portfolio health', screen: null },
-              { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts', screen: 'properties' },
+              { label: 'Landlords', value: displayLandlords.length, color: '#4a9eff', sub: 'Linked accounts', screen: 'landlords' },
             ].map((s, i) => (
               <div key={i} onClick={() => { if (s.onClick) s.onClick(); else if (s.screen) setAgentScreen(s.screen); }} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '18px 20px', flex: 1, minWidth: '130px', cursor: (s.screen || s.onClick) ? 'pointer' : 'default', transition: 'border-color 0.2s' }}
                 onMouseEnter={e => { if (s.screen) e.currentTarget.style.borderColor = 'rgba(43,124,211,0.4)'; }}
@@ -3680,7 +3680,7 @@ function App() {
                       <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
                       <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
                     </div>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.email || '—'}</p>
+                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.full_name || landlord?.email || '—'}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${scoreColor}20`, border: `2px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ color: scoreColor, fontWeight: '900', fontSize: '11px' }}>{score}</span>
