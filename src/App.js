@@ -1220,7 +1220,13 @@ function App() {
   }, []);
 
   const loadUserRecord = async (userId, authUser) => {
-    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+    let { data } = await supabase.from('users').select('*').eq('id', userId).single();
+    if (!data && authUser) {
+      // First time this authenticated session has been seen — most likely they've
+      // just confirmed their email and this is their first real sign-in. Create
+      // their profile now using the details saved at signup time.
+      data = await createUserProfile(authUser);
+    }
     if (data) {
       setUserRecord(data);
       if (data.logo_url) setLandlordLogoUrl(data.logo_url);
@@ -2049,72 +2055,91 @@ function App() {
     if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
     if (!captchaToken) { setError('Please complete the CAPTCHA.'); setLoading(false); return; }
 
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { captchaToken } });
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      options: {
+        captchaToken,
+        data: {
+          full_name: fullName,
+          account_type: accountType,
+          agency_name: accountType === 'agent' ? agencyName : null,
+          referral_source: referralSource || null,
+          invite_token: new URLSearchParams(window.location.search).get('invite') || null,
+          legacy_agent_code: new URLSearchParams(window.location.search).get('agent') || null,
+        }
+      }
+    });
     if (error) { setError(error.message); captchaRef.current?.resetCaptcha(); setCaptchaToken(''); setLoading(false); return; }
 
     const authUser = data.session?.user || data.user;
 
-    if (authUser) {
-      const { data: existing } = await supabase.from('users').select('id').eq('id', authUser.id).single();
-      if (!existing) {
-        const inviteToken = new URLSearchParams(window.location.search).get('invite');
-        const legacyAgentCode = new URLSearchParams(window.location.search).get('agent');
-        let resolvedAgentCode = null;
-
-        // Secure path — verify a genuine invitation token belongs to this email
-        if (inviteToken && accountType === 'landlord') {
-          const { data: invitation } = await supabase
-            .from('invitations')
-            .select('id, agency_id, landlord_email, status')
-            .eq('token', inviteToken)
-            .eq('status', 'pending')
-            .maybeSingle();
-
-          if (invitation && invitation.landlord_email.toLowerCase() === email.toLowerCase()) {
-            const { data: agencyRecord } = await supabase.from('users').select('agent_code').eq('id', invitation.agency_id).single();
-            resolvedAgentCode = agencyRecord?.agent_code || null;
-            await supabase.from('invitations').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invitation.id);
-          }
-        }
-
-        // Legacy fallback — old shared links without a secure token still work, just without verification
-        if (!resolvedAgentCode && legacyAgentCode) {
-          resolvedAgentCode = legacyAgentCode;
-        }
-
-        const { error: insertError } = await supabase.from('users').insert([{ 
-          id: authUser.id, 
-          email: email, 
-          account_type: accountType,
-          agency_name: accountType === 'agent' ? agencyName : null,
-          agent_code: accountType === 'agent' ? authUser.id.split('-')[0] : null,
-          referred_by_agent: resolvedAgentCode || null,
-          referral_source: referralSource || null
-        }]);
-        // If landlord signed up via agent invite link, link their properties to agent
-        if (resolvedAgentCode && accountType === 'landlord') {
-          await supabase.from('users').update({ referred_by_agent: resolvedAgentCode }).eq('id', authUser.id);
-        }
-        // Claim any properties an agent added on this landlord's behalf before they signed up
-        if (accountType === 'landlord') {
-          await supabase.from('properties').update({ user_id: authUser.id, pending_landlord_email: null }).eq('pending_landlord_email', email.toLowerCase());
-        }
-        if (insertError) { setError(insertError.message); setLoading(false); return; }
+    if (authUser && data.session?.user) {
+      // We have a real authenticated session right now (confirmation off, or
+      // not required) — safe to create the profile row immediately.
+      await createUserProfile(data.session.user);
+      setUser(data.session.user);
+      await loadUserRecord(data.session.user.id, data.session.user);
+      if (accountType !== 'agent') setShowOnboarding(true);
+      setScreen('dashboard');
+      if (!localStorage.getItem('tlm_home_banner_dismissed')) {
+        setShowHomeBanner(true);
       }
-
-      if (data.session?.user) {
-        setUser(data.session.user);
-        await loadUserRecord(data.session.user.id, data.session.user);
-        if (accountType !== 'agent') setShowOnboarding(true);
-        setScreen('dashboard');
-        if (!localStorage.getItem('tlm_home_banner_dismissed')) {
-          setShowHomeBanner(true);
-        }
-      } else {
-        setScreen('verify');
-      }
+    } else {
+      // No session yet — confirmation is required. Don't touch the database
+      // (there's no authenticated context to do it safely). Everything needed
+      // to create the profile later is saved in user_metadata above, and will
+      // be picked up automatically the moment they confirm and sign in.
+      setScreen('verify');
     }
     setLoading(false);
+  };
+
+  const createUserProfile = async (authUser) => {
+    const { data: existing } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+    if (existing) return existing;
+
+    const meta = authUser.user_metadata || {};
+    const userEmail = authUser.email;
+    const metaAccountType = meta.account_type || 'landlord';
+    let resolvedAgentCode = null;
+
+    if (meta.invite_token && metaAccountType === 'landlord') {
+      const { data: invitation } = await supabase
+        .from('invitations')
+        .select('id, agency_id, landlord_email, status')
+        .eq('token', meta.invite_token)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (invitation && invitation.landlord_email.toLowerCase() === userEmail.toLowerCase()) {
+        const { data: agencyRecord } = await supabase.from('users').select('agent_code').eq('id', invitation.agency_id).single();
+        resolvedAgentCode = agencyRecord?.agent_code || null;
+        await supabase.from('invitations').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invitation.id);
+      }
+    }
+    if (!resolvedAgentCode && meta.legacy_agent_code) {
+      resolvedAgentCode = meta.legacy_agent_code;
+    }
+
+    const { error: insertError } = await supabase.from('users').insert([{
+      id: authUser.id,
+      email: userEmail,
+      account_type: metaAccountType,
+      agency_name: metaAccountType === 'agent' ? meta.agency_name : null,
+      agent_code: metaAccountType === 'agent' ? authUser.id.split('-')[0] : null,
+      referred_by_agent: resolvedAgentCode || null,
+      referral_source: meta.referral_source || null,
+    }]);
+    if (insertError) return null;
+
+    if (resolvedAgentCode && metaAccountType === 'landlord') {
+      await supabase.from('users').update({ referred_by_agent: resolvedAgentCode }).eq('id', authUser.id);
+    }
+    if (metaAccountType === 'landlord') {
+      await supabase.from('properties').update({ user_id: authUser.id, pending_landlord_email: null }).eq('pending_landlord_email', userEmail.toLowerCase());
+    }
+
+    const { data: created } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+    return created;
   };
 
   const handleForgotPassword = async () => {
