@@ -1059,6 +1059,7 @@ function App() {
   const [resendingId, setResendingId] = useState(null);
   const [nameAutoFilled, setNameAutoFilled] = useState(false);
   const [showAgentAddProperty, setShowAgentAddProperty] = useState(false);
+  const [agentAddPropertyMessage, setAgentAddPropertyMessage] = useState(null);
   const [agentNewLandlordEmail, setAgentNewLandlordEmail] = useState('');
   const [showAgentUpload, setShowAgentUpload] = useState(false);
   const [agentUploadFile, setAgentUploadFile] = useState(null);
@@ -1761,9 +1762,16 @@ function App() {
       setAgentAddPropertyError("Please enter the landlord's email address.");
       return;
     }
+    const emailTrimmed = agentNewLandlordEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      setAgentAddPropertyError('That doesn\u2019t look like a valid email address — please check it and try again.');
+      return;
+    }
+
     setAgentAddPropertySaving(true);
     setAgentAddPropertyError('');
-    const emailTrimmed = agentNewLandlordEmail.trim().toLowerCase();
+    setAgentAddPropertyMessage(null);
 
     try {
       // Does this landlord already have an account?
@@ -1773,6 +1781,22 @@ function App() {
         .eq('email', emailTrimmed)
         .eq('account_type', 'landlord')
         .maybeSingle();
+
+      // Has this exact property already been added for this exact landlord?
+      const { data: possibleDupes } = await supabase
+        .from('properties')
+        .select('id, user_id, pending_landlord_email')
+        .eq('added_by_agent_id', user.id)
+        .ilike('address_line_1', newAddress);
+
+      const isDuplicate = (possibleDupes || []).some(p =>
+        existingLandlord ? p.user_id === existingLandlord.id : (p.pending_landlord_email || '').toLowerCase() === emailTrimmed
+      );
+      if (isDuplicate) {
+        setAgentAddPropertyError('You\u2019ve already added this property for this landlord — check your properties list.');
+        setAgentAddPropertySaving(false);
+        return;
+      }
 
       const propertyRecord = {
         user_id: existingLandlord ? existingLandlord.id : null,
@@ -1786,26 +1810,49 @@ function App() {
       const { error: insertError } = await supabase.from('properties').insert([propertyRecord]);
       if (insertError) throw insertError;
 
-      // If the landlord doesn't have an account yet, send them a proper invite too
-      if (!existingLandlord) {
-        const { data: newInvite, error: inviteErr } = await supabase
+      if (existingLandlord) {
+        setAgentAddPropertyMessage({ type: 'success', text: `\u2713 Linked directly to ${emailTrimmed}'s existing account — it'll be waiting for them next time they log in. No invite needed.` });
+      } else {
+        // Reuse an existing pending invite for this landlord if one exists, rather than creating a duplicate
+        const { data: existingInvite } = await supabase
           .from('invitations')
-          .insert([{ agency_id: user.id, landlord_email: emailTrimmed }])
-          .select('token')
-          .single();
-        if (!inviteErr && newInvite) {
-          const inviteLink = `https://app.thelandlordmate.com?invite=${newInvite.token}`;
-          fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: emailTrimmed,
-              full_name: 'there',
-              template: 'agent_added_property',
-              extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink, propertyAddress: newAddress },
-            })
-          }).catch(() => {});
+          .select('id, token, resend_count')
+          .eq('agency_id', user.id)
+          .eq('landlord_email', emailTrimmed)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+        let token;
+        if (existingInvite) {
+          token = existingInvite.token;
+          await supabase.from('invitations').update({
+            last_sent_at: new Date().toISOString(),
+            resend_count: (existingInvite.resend_count || 0) + 1,
+            property_address: newAddress,
+          }).eq('id', existingInvite.id);
+        } else {
+          const { data: newInvite, error: inviteErr } = await supabase
+            .from('invitations')
+            .insert([{ agency_id: user.id, landlord_email: emailTrimmed, property_address: newAddress }])
+            .select('token')
+            .single();
+          if (inviteErr) throw inviteErr;
+          token = newInvite.token;
         }
+
+        const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
+        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: emailTrimmed,
+            full_name: 'there',
+            template: 'agent_added_property',
+            extra: { agencyName: toDisplayCase(userRecord?.agency_name) || 'Your letting agent', inviteLink, propertyAddress: newAddress },
+          })
+        }).catch(() => {});
+
+        setAgentAddPropertyMessage({ type: 'info', text: `\u2713 Property saved. ${emailTrimmed} doesn't have an account yet, so we've sent them an invite to claim it${existingInvite ? ' (reusing their existing pending invite)' : ''}.` });
       }
 
       setShowAgentAddProperty(false);
@@ -3197,10 +3244,17 @@ function App() {
             <button onClick={() => setShowBulkInvite(!showBulkInvite)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               📋 Bulk Invite
             </button>
-            <button onClick={() => setShowAgentAddProperty(!showAgentAddProperty)} style={{ padding: '8px 16px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={() => { setShowAgentAddProperty(!showAgentAddProperty); setAgentAddPropertyMessage(null); setAgentAddPropertyError(''); }} style={{ padding: '8px 16px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               🏠 Add Property for Landlord
             </button>
           </div>
+
+          {agentAddPropertyMessage && (
+            <div style={{ background: agentAddPropertyMessage.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(43,124,211,0.1)', border: `1px solid ${agentAddPropertyMessage.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(43,124,211,0.3)'}`, borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+              <p style={{ margin: 0, color: agentAddPropertyMessage.type === 'success' ? '#4ade80' : '#4a9eff', fontSize: '13px', fontWeight: '600', lineHeight: '1.5' }}>{agentAddPropertyMessage.text}</p>
+              <button onClick={() => setAgentAddPropertyMessage(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>✕</button>
+            </div>
+          )}
 
           {/* Agent add property on behalf of landlord */}
           {showAgentAddProperty && (
@@ -3282,6 +3336,7 @@ function App() {
                       <div style={{ minWidth: '180px' }}>
                         <p style={{ margin: 0, color: 'white', fontSize: '13px', fontWeight: '600' }}>{inv.landlord_name || inv.landlord_email}</p>
                         {inv.landlord_name && <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{inv.landlord_email}</p>}
+                        {inv.property_address && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>🏠 {inv.property_address}</p>}
                       </div>
                       <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: isAccepted ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)', color: isAccepted ? '#22c55e' : '#eab308' }}>
                         {isAccepted ? '✓ Signed Up' : `Pending${daysSinceSent > 0 ? ` · sent ${daysSinceSent}d ago` : ''}`}
