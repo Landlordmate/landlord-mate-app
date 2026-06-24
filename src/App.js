@@ -1486,11 +1486,23 @@ function App() {
 
   const handleAgentDeleteProperty = async () => {
     if (!window.confirm(`Remove ${selectedAgentProperty.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
-    await supabase.from('documents').delete().eq('property_id', selectedAgentProperty.id);
-    await supabase.from('properties').delete().eq('id', selectedAgentProperty.id);
-    setAgentProperties(agentProperties.filter(p => p.id !== selectedAgentProperty.id));
-    setSelectedAgentProperty(null);
-    setAgentScreen('properties');
+    try {
+      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-delete-property', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ propertyId: selectedAgentProperty.id, agentId: user.id }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.error) {
+        alert(result.error || 'Could not delete this property — please try again.');
+        return;
+      }
+      setAgentProperties(agentProperties.filter(p => p.id !== selectedAgentProperty.id));
+      setSelectedAgentProperty(null);
+      setAgentScreen('properties');
+    } catch (e) {
+      alert('Could not delete this property — please try again.');
+    }
   };
 
   const handleDeleteAgentNote = async (noteId) => {
@@ -1518,8 +1530,9 @@ function App() {
     if (!error) {
       const { data } = supabase.storage.from('logos').getPublicUrl(path);
       await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
-      setAgencyLogoUrl(data.publicUrl);
-      setUserRecord({ ...userRecord, logo_url: data.publicUrl });
+      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setAgencyLogoUrl(bustedUrl);
+      setUserRecord({ ...userRecord, logo_url: bustedUrl });
     } else {
       console.error('Logo upload error:', error);
     }
@@ -1540,7 +1553,7 @@ function App() {
         setLandlordLogoError('Saved the image but failed to update your profile. Please try again.');
         return false;
       }
-      setLandlordLogoUrl(data.publicUrl);
+      setLandlordLogoUrl(`${data.publicUrl}?t=${Date.now()}`);
       setLandlordLogoSaved(true);
       setTimeout(() => setLandlordLogoSaved(false), 3000);
       return true;
@@ -1594,8 +1607,9 @@ function App() {
     if (!error) {
       const { data } = supabase.storage.from('logos').getPublicUrl(path);
       await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
-      setAgencyLogoUrl(data.publicUrl);
-      setUserRecord({ ...userRecord, logo_url: data.publicUrl });
+      const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setAgencyLogoUrl(bustedUrl);
+      setUserRecord({ ...userRecord, logo_url: bustedUrl });
       setLogoSaved(true);
       setTimeout(() => setLogoSaved(false), 3000);
     }
