@@ -1494,6 +1494,30 @@ function App() {
     setAgentEditingProperty(false);
   };
 
+  const handleDeleteAgentAccount = async () => {
+    if (!window.confirm("Are you sure? This will permanently delete your agency account, invitations, notes, and templates. Your landlords' properties and documents are NOT affected. This cannot be undone.")) return;
+    if (!window.confirm('Last chance — are you absolutely sure you want to delete your agency account?')) return;
+    // Disconnect (don't delete) any properties linked to this agent — the
+    // property and its documents stay with the landlord, only the link breaks.
+    await supabase.from('properties').update({ added_by_agent_id: null }).eq('added_by_agent_id', user.id);
+    await supabase.from('properties').update({ agent_email: null }).eq('agent_email', user.email.toLowerCase());
+    await supabase.from('invitations').delete().eq('agency_id', user.id);
+    await supabase.from('agent_notes').delete().eq('agent_id', user.id);
+    await supabase.from('templates').delete().eq('agent_id', user.id);
+    await supabase.from('users').delete().eq('id', user.id);
+    try {
+      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch (e) {
+      // Data is already gone either way — don't block sign-out over this step.
+    }
+    await supabase.auth.signOut();
+    setUser(null); setAgentProperties([]); setAgentLandlords([]); setScreen('login');
+  };
+
   const handleAgentDeleteProperty = async () => {
     if (!window.confirm(`Remove ${selectedAgentProperty.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
     try {
@@ -4784,30 +4808,7 @@ function App() {
     setUser(null); setProperties([]); setAllDocuments([]); setScreen('login');
   };
 
-  const handleDeleteAgentAccount = async () => {
-    if (!window.confirm("Are you sure? This will permanently delete your agency account, invitations, notes, and templates. Your landlords' properties and documents are NOT affected. This cannot be undone.")) return;
-    if (!window.confirm('Last chance — are you absolutely sure you want to delete your agency account?')) return;
-    // Disconnect (don't delete) any properties linked to this agent — the
-    // property and its documents stay with the landlord, only the link breaks.
-    await supabase.from('properties').update({ added_by_agent_id: null }).eq('added_by_agent_id', user.id);
-    await supabase.from('properties').update({ agent_email: null }).eq('agent_email', user.email.toLowerCase());
-    await supabase.from('invitations').delete().eq('agency_id', user.id);
-    await supabase.from('agent_notes').delete().eq('agent_id', user.id);
-    await supabase.from('templates').delete().eq('agent_id', user.id);
-    await supabase.from('users').delete().eq('id', user.id);
-    try {
-      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
-        body: JSON.stringify({ userId: user.id }),
-      });
-    } catch (e) {
-      // Data is already gone either way — don't block sign-out over this step.
-    }
-    await supabase.auth.signOut();
-    setUser(null); setAgentProperties([]); setAgentLandlords([]); setScreen('login');
-  };
-
+  
   if (user && screen === 'settings') {
     return (
       <AppShell screen="settings" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
