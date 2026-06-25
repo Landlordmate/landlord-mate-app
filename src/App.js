@@ -1012,6 +1012,7 @@ function App() {
   const [editPropertyAddress, setEditPropertyAddress] = useState('');
   const [editPropertyType, setEditPropertyType] = useState('house');
   const [editPropertyCountry, setEditPropertyCountry] = useState('Wales');
+  const [editPropertyAgentEmail, setEditPropertyAgentEmail] = useState('');
   const [landlordDocs, setLandlordDocs] = useState([]);
   const [showLandlordUpload, setShowLandlordUpload] = useState(false);
   const [landlordDocType, setLandlordDocType] = useState(LANDLORD_DOC_TYPES[0]);
@@ -2364,12 +2365,26 @@ function App() {
     }
   };
 
-  const handleEditProperty = (p, e) => { e.stopPropagation(); setEditingProperty(p); setEditPropertyAddress(p.address_line_1); setEditPropertyType(p.property_type); setEditPropertyCountry(p.country || 'Wales'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleEditProperty = (p, e) => { e.stopPropagation(); setEditingProperty(p); setEditPropertyAddress(p.address_line_1); setEditPropertyType(p.property_type); setEditPropertyCountry(p.country || 'Wales'); setEditPropertyAgentEmail(p.agent_email || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const handleSaveEditProperty = async () => {
-    const { error } = await supabase.from('properties').update({ address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry }).eq('id', editingProperty.id);
+    const newAgentEmailTrimmed = editPropertyAgentEmail.trim().toLowerCase();
+    const isNewAgentEmail = newAgentEmailTrimmed && newAgentEmailTrimmed !== (editingProperty.agent_email || '').toLowerCase();
+    const { error } = await supabase.from('properties').update({ address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry, agent_email: newAgentEmailTrimmed || null }).eq('id', editingProperty.id);
     if (error) { alert(error.message); return; }
-    setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry } : p));
+    setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry, agent_email: newAgentEmailTrimmed || null } : p));
+    if (isNewAgentEmail) {
+      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newAgentEmailTrimmed,
+          full_name: 'there',
+          subject: `${userRecord?.full_name || 'A landlord'} has shared a property with you on The Landlord Mate`,
+          message: `${userRecord?.full_name || 'A landlord you work with'} has linked ${editPropertyAddress} to you on The Landlord Mate. If you have an account, it'll appear in your Properties list automatically. If not, you can sign up free at app.thelandlordmate.com.`,
+        })
+      }).catch(() => {});
+    }
     setEditingProperty(null);
   };
 
@@ -4169,10 +4184,12 @@ function App() {
                 <option value="flat">Flat</option>
                 <option value="hmo">HMO</option>
               </select>
-              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
+<label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
               <select value={editPropertyCountry} onChange={(e) => setEditPropertyCountry(e.target.value)} style={inputStyle}>
                 {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional — links this property to your agent's account if they're already on The Landlord Mate, or invites them if not)</span></label>
+              <input type="email" placeholder="e.g. agent@shepherdsharpe.co.uk" value={editPropertyAgentEmail} onChange={(e) => setEditPropertyAgentEmail(e.target.value)} style={inputStyle} />
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={handleSaveEditProperty} style={{ ...primaryBtn, flex: 1 }}>Save Changes</button>
                 <button onClick={() => setEditingProperty(null)} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
