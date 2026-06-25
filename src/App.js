@@ -1090,6 +1090,9 @@ function App() {
   const [agentGroupByLandlord, setAgentGroupByLandlord] = useState(false);
   const [agentPropertiesPage, setAgentPropertiesPage] = useState(1);
   const [collapsedLandlordGroups, setCollapsedLandlordGroups] = useState({});
+  const [editingLandlordId, setEditingLandlordId] = useState(null);
+  const [editingLandlordName, setEditingLandlordName] = useState('');
+  const [savingLandlordName, setSavingLandlordName] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteLandlordEmail, setInviteLandlordEmail] = useState('');
   const [inviteLandlordName, setInviteLandlordName] = useState('');
@@ -2936,7 +2939,7 @@ function App() {
     const filteredAndSearched = displayProperties.filter(p => {
       const score = getHealthScoreD(p.id);
       const landlord = getLandlordD(p);
-      const matchesSearch = !agentSearch || p.address_line_1.toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.email || '').toLowerCase().includes(agentSearch.toLowerCase());
+      const matchesSearch = !agentSearch || p.address_line_1.toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.email || '').toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.full_name || '').toLowerCase().includes(agentSearch.toLowerCase());
       const matchesFilter = agentFilter === 'all' || (agentFilter === 'red' && score < 50) || (agentFilter === 'amber' && score >= 50 && score < 80) || (agentFilter === 'green' && score >= 80) || (agentFilter === 'none' && displayDocuments.filter(d => d.property_id === p.id).length === 0);
       return matchesSearch && matchesFilter;
     });
@@ -3302,12 +3305,40 @@ function App() {
                 {landlordsList.map((l, i) => (
                   <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0', padding: '14px 20px', borderBottom: i < landlordsList.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
                     <div>
-                      <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{l.full_name || l.email}</p>
-                      {l.full_name && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{l.email}</p>}
+                      {editingLandlordId === l.id ? (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <input type="text" autoFocus value={editingLandlordName} onChange={e => setEditingLandlordName(e.target.value)} style={{ ...inputStyle, marginBottom: 0, padding: '6px 10px', fontSize: '13px', maxWidth: '180px' }} />
+                          <button disabled={savingLandlordName} onClick={async () => {
+                            if (!editingLandlordName.trim()) return;
+                            setSavingLandlordName(true);
+                            try {
+                              const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-update-landlord-name', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+                                body: JSON.stringify({ agentId: user.id, landlordId: l.id, fullName: editingLandlordName.trim() }),
+                              });
+                              const result = await res.json();
+                              if (!res.ok || result.error) { alert(result.error || 'Could not update this name — please try again.'); }
+                              else { setAgentLandlords(prev => prev.map(al => al.id === l.id ? { ...al, full_name: editingLandlordName.trim() } : al)); }
+                            } catch (e) { alert('Could not update this name — please try again.'); }
+                            setSavingLandlordName(false);
+                            setEditingLandlordId(null);
+                          }} style={{ padding: '6px 10px', background: blue, color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>{savingLandlordName ? '...' : 'Save'}</button>
+                          <button onClick={() => setEditingLandlordId(null)} style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div>
+                            <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{l.full_name || l.email}</p>
+                            {l.full_name && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{l.email}</p>}
+                          </div>
+                          <button onClick={() => { setEditingLandlordId(l.id); setEditingLandlordName(l.full_name || ''); }} title="Edit name" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: '12px', cursor: 'pointer', padding: '2px' }}>✏️</button>
+                        </div>
+                      )}
                     </div>
                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{l.propertyCount} {l.propertyCount === 1 ? 'property' : 'properties'}</p>
                     <p style={{ margin: 0, color: l.avgScore === null ? 'rgba(255,255,255,0.3)' : getHealthColor(l.avgScore), fontSize: '13px', fontWeight: '700' }}>{l.avgScore === null ? '—' : `${l.avgScore}/100`}</p>
-                    <p onClick={() => { if (l.firstProperty) handleSelectAgentProperty(l.firstProperty); }} style={{ margin: 0, color: l.firstProperty ? blue : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: l.firstProperty ? 'pointer' : 'default' }}>{l.firstProperty ? 'View →' : '—'}</p>
+                    <p onClick={() => { setAgentSearch(l.full_name || l.email); setAgentPropertiesPage(1); setAgentScreen('properties'); }} style={{ margin: 0, color: l.propertyCount > 0 ? blue : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: l.propertyCount > 0 ? 'pointer' : 'default' }}>{l.propertyCount > 0 ? `View all ${l.propertyCount} →` : '—'}</p>
                   </div>
                 ))}
               </div>
@@ -3481,6 +3512,11 @@ function App() {
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 16px' }}>Support</p>
               <a href="mailto:thelandlordmate@gmail.com" style={{ color: blue, fontSize: '13px', fontWeight: '600' }}>thelandlordmate@gmail.com</a>
+            </div>
+            <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '14px', padding: '24px', marginTop: '16px' }}>
+              <p style={{ color: '#ef4444', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 12px' }}>Danger Zone</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 16px' }}>This deletes your agency account, invitations, notes, and templates. Properties and documents belonging to your landlords are not affected — they'll simply no longer show as linked to your agency.</p>
+              <button onClick={handleDeleteAgentAccount} style={{ padding: '10px 20px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Delete My Agency Account</button>
             </div>
           </div>
         </div>
@@ -4708,6 +4744,9 @@ function App() {
     const { data, error } = await supabase.auth.updateUser({ data: { full_name: settingsName.trim() } });
     if (!error) {
       if (data?.user) setUser(data.user);
+      const { error: rowError } = await supabase.from('users').update({ full_name: settingsName.trim() }).eq('id', user.id);
+      if (rowError) console.error('Display name row update error:', rowError);
+      setUserRecord(prev => prev ? { ...prev, full_name: settingsName.trim() } : prev);
       setSettingsNameSaved(true);
       setTimeout(() => setSettingsNameSaved(false), 3000);
     } else {
@@ -4743,6 +4782,30 @@ function App() {
     }
     await supabase.auth.signOut();
     setUser(null); setProperties([]); setAllDocuments([]); setScreen('login');
+  };
+
+  const handleDeleteAgentAccount = async () => {
+    if (!window.confirm("Are you sure? This will permanently delete your agency account, invitations, notes, and templates. Your landlords' properties and documents are NOT affected. This cannot be undone.")) return;
+    if (!window.confirm('Last chance — are you absolutely sure you want to delete your agency account?')) return;
+    // Disconnect (don't delete) any properties linked to this agent — the
+    // property and its documents stay with the landlord, only the link breaks.
+    await supabase.from('properties').update({ added_by_agent_id: null }).eq('added_by_agent_id', user.id);
+    await supabase.from('properties').update({ agent_email: null }).eq('agent_email', user.email.toLowerCase());
+    await supabase.from('invitations').delete().eq('agency_id', user.id);
+    await supabase.from('agent_notes').delete().eq('agent_id', user.id);
+    await supabase.from('templates').delete().eq('agent_id', user.id);
+    await supabase.from('users').delete().eq('id', user.id);
+    try {
+      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch (e) {
+      // Data is already gone either way — don't block sign-out over this step.
+    }
+    await supabase.auth.signOut();
+    setUser(null); setAgentProperties([]); setAgentLandlords([]); setScreen('login');
   };
 
   if (user && screen === 'settings') {
