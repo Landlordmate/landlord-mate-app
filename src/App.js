@@ -539,7 +539,10 @@ function AgentView({ token }) {
                   {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
                 </div>
               </div>
-              {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
+                {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+              </div>
             </div>
           );
         })}
