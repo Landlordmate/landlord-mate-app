@@ -946,6 +946,7 @@ function App() {
   const [properties, setProperties] = useState([]);
   const [allDocuments, setAllDocuments] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [propertyActionMessage, setPropertyActionMessage] = useState(null);
   const [newAddress, setNewAddress] = useState('');
   const [newPostcode, setNewPostcode] = useState('');
   const [newType, setNewType] = useState('house');
@@ -2388,12 +2389,29 @@ function App() {
       alert('This property is already in your account — your agent may have already added it for you. Check your properties list.');
       return;
     }
-    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry, agent_email: newAgentEmail || null }]).select();
+    const agentEmailTrimmed = newAgentEmail.trim().toLowerCase();
+    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry, agent_email: agentEmailTrimmed || null }]).select();
     if (error) { alert(error.message); return; }
     if (data) {
       const newProps = [...properties, data[0]];
       setProperties(newProps);
       await loadAllDocuments(newProps);
+      if (agentEmailTrimmed) {
+        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: agentEmailTrimmed,
+            full_name: 'there',
+            subject: `${user?.user_metadata?.full_name || 'A landlord'} has linked a property to you on The Landlord Mate`,
+            message: `${user?.user_metadata?.full_name || 'A landlord you work with'} has linked ${newAddress} to you on The Landlord Mate. If you have an account, it'll appear in your Properties list automatically. If not, you can sign up free at app.thelandlordmate.com.`,
+          })
+        }).catch(() => {});
+        setPropertyActionMessage(`✓ Property added and linked to ${agentEmailTrimmed} — they've been emailed to let them know.`);
+      } else {
+        setPropertyActionMessage('✓ Property added.');
+      }
+      setTimeout(() => setPropertyActionMessage(null), 6000);
       setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail('');
     }
   };
@@ -2417,7 +2435,11 @@ function App() {
           message: `${userRecord?.full_name || 'A landlord you work with'} has linked ${editPropertyAddress} to you on The Landlord Mate. If you have an account, it'll appear in your Properties list automatically. If not, you can sign up free at app.thelandlordmate.com.`,
         })
       }).catch(() => {});
+      setPropertyActionMessage(`✓ Saved and linked to ${newAgentEmailTrimmed} — they've been emailed to let them know.`);
+    } else {
+      setPropertyActionMessage('✓ Property updated.');
     }
+    setTimeout(() => setPropertyActionMessage(null), 6000);
     setEditingProperty(null);
   };
 
@@ -4325,6 +4347,13 @@ function App() {
               <button onClick={() => setPropertyViewMode('list')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'list' ? blue : 'transparent', color: propertyViewMode === 'list' ? 'white' : 'rgba(255,255,255,0.5)' }}>☰ List</button>
             </div>
           </div>
+
+          {propertyActionMessage && (
+            <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+              <p style={{ margin: 0, color: '#4ade80', fontSize: '13px', fontWeight: '600', lineHeight: '1.5' }}>{propertyActionMessage}</p>
+              <button onClick={() => setPropertyActionMessage(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>✕</button>
+            </div>
+          )}
 
           {properties.length === 0 && !showAdd && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
