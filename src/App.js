@@ -2403,8 +2403,8 @@ function App() {
           body: JSON.stringify({
             email: agentEmailTrimmed,
             full_name: 'there',
-            subject: `${user?.user_metadata?.full_name || 'A landlord'} has linked a property to you on The Landlord Mate`,
-            message: `${user?.user_metadata?.full_name || 'A landlord you work with'} has linked ${newAddress} to you on The Landlord Mate. If you have an account, it'll appear in your Properties list automatically. If not, you can sign up free at app.thelandlordmate.com.`,
+            template: 'landlord_linked_agent',
+            extra: { landlordName: user?.user_metadata?.full_name || 'A landlord', propertyAddress: newAddress },
           })
         }).catch(() => {});
         setPropertyActionMessage(`✓ Property added and linked to ${agentEmailTrimmed} — they've been emailed to let them know.`);
@@ -2431,8 +2431,8 @@ function App() {
         body: JSON.stringify({
           email: newAgentEmailTrimmed,
           full_name: 'there',
-          subject: `${userRecord?.full_name || 'A landlord'} has shared a property with you on The Landlord Mate`,
-          message: `${userRecord?.full_name || 'A landlord you work with'} has linked ${editPropertyAddress} to you on The Landlord Mate. If you have an account, it'll appear in your Properties list automatically. If not, you can sign up free at app.thelandlordmate.com.`,
+          template: 'landlord_linked_agent',
+          extra: { landlordName: userRecord?.full_name || 'A landlord', propertyAddress: editPropertyAddress },
         })
       }).catch(() => {});
       setPropertyActionMessage(`✓ Saved and linked to ${newAgentEmailTrimmed} — they've been emailed to let them know.`);
