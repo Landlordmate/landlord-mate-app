@@ -3827,7 +3827,23 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
             <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>🔗 Share with your letting agent</p>
             <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>No login required — they just click the link.</p>
-            {shareLink && <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all' }}>{shareLink}</div>}
+            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+              {selectedProperty.agent_email ? (
+                <p style={{ margin: 0, color: '#7eb6f5', fontSize: '12px', lineHeight: '1.6' }}>✓ You've already linked <strong>{selectedProperty.agent_email}</strong> to this property — they can already see it automatically, no link needed. Only use the link below if you want to show someone else, or your agent isn't on The Landlord Mate yet.</p>
+              ) : (
+                <p style={{ margin: 0, color: '#7eb6f5', fontSize: '12px', lineHeight: '1.6' }}>💡 If your agent already uses The Landlord Mate, it's easier to add their email under <strong>Edit</strong> above instead — that connects permanently, no link needed ever again. Use the link below only if they're not signed up yet, or you just want to show them quickly.</p>
+              )}
+            </div>
+            {shareLink && (
+              <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all' }}>{shareLink}</p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <a href={`mailto:?subject=${encodeURIComponent('Compliance documents for ' + selectedProperty.address_line_1)}&body=${encodeURIComponent(`Hi,\n\nHere's a link to view the compliance documents for ${selectedProperty.address_line_1}, no login needed:\n\n${shareLink}\n\nThanks`)}`} style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)', color: 'white', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>✉️ Email it</a>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(`Here's a link to view the compliance documents for ${selectedProperty.address_line_1}, no login needed: ${shareLink}`)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)', color: 'white', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>💬 WhatsApp it</a>
+                  <a href={`sms:?body=${encodeURIComponent(`Here's a link to view the compliance documents for ${selectedProperty.address_line_1}, no login needed: ${shareLink}`)}`} style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)', color: 'white', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>📱 Text it</a>
+                </div>
+              </div>
+            )}
             <button onClick={handleGenerateShareLink} style={{ background: shareCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               {shareCopied ? '✓ Link copied!' : shareLink ? 'Generate new link' : 'Generate share link'}
             </button>
