@@ -1087,6 +1087,9 @@ function App() {
   const [agentProperties, setAgentProperties] = useState([]);
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
+  const [agentGroupByLandlord, setAgentGroupByLandlord] = useState(false);
+  const [agentPropertiesPage, setAgentPropertiesPage] = useState(1);
+  const [collapsedLandlordGroups, setCollapsedLandlordGroups] = useState({});
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteLandlordEmail, setInviteLandlordEmail] = useState('');
   const [inviteLandlordName, setInviteLandlordName] = useState('');
@@ -2938,6 +2941,34 @@ function App() {
       return matchesSearch && matchesFilter;
     });
 
+    const PROPERTIES_PER_PAGE = 20;
+    const LANDLORD_GROUPS_PER_PAGE = 10;
+
+    // Group filtered properties by landlord (used when agentGroupByLandlord is on).
+    // Sorted so landlords with the most pressing properties (lowest score) surface first.
+    const landlordGroupsAll = (() => {
+      const map = new Map();
+      filteredAndSearched.forEach(p => {
+        const landlord = getLandlordD(p);
+        const key = landlord?.id || 'unlinked';
+        if (!map.has(key)) map.set(key, { landlord, properties: [] });
+        map.get(key).properties.push(p);
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        const aMin = Math.min(...a.properties.map(p => getHealthScoreD(p.id)));
+        const bMin = Math.min(...b.properties.map(p => getHealthScoreD(p.id)));
+        return aMin - bMin;
+      });
+    })();
+
+    const totalPages = agentGroupByLandlord
+      ? Math.max(1, Math.ceil(landlordGroupsAll.length / LANDLORD_GROUPS_PER_PAGE))
+      : Math.max(1, Math.ceil(filteredAndSearched.length / PROPERTIES_PER_PAGE));
+    const safePage = Math.min(agentPropertiesPage, totalPages);
+
+    const pagedProperties = filteredAndSearched.slice((safePage - 1) * PROPERTIES_PER_PAGE, safePage * PROPERTIES_PER_PAGE);
+    const pagedLandlordGroups = landlordGroupsAll.slice((safePage - 1) * LANDLORD_GROUPS_PER_PAGE, safePage * LANDLORD_GROUPS_PER_PAGE);
+
     const navItems = [
       { id: 'dashboard', label: '📊 Dashboard' },
       { id: 'properties', label: '🏠 Properties' },
@@ -3698,7 +3729,7 @@ function App() {
 
           {/* Search + Filter + Export */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input type="text" placeholder="Search properties or landlords..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} style={{ flex: 1, minWidth: '200px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
+            <input type="text" placeholder="Search properties or landlords..." value={agentSearch} onChange={e => { setAgentSearch(e.target.value); setAgentPropertiesPage(1); }} style={{ flex: 1, minWidth: '200px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white' }} />
             {[
               { id: 'all', label: 'All' },
               { id: 'red', label: '🔴 Action' },
@@ -3706,10 +3737,13 @@ function App() {
               { id: 'green', label: '🟢 Good' },
               { id: 'none', label: '⚫ No Docs' },
             ].map(f => (
-              <button key={f.id} onClick={() => setAgentFilter(f.id)} style={{ padding: '6px 12px', background: agentFilter === f.id ? blue : 'rgba(255,255,255,0.06)', color: agentFilter === f.id ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentFilter === f.id ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+              <button key={f.id} onClick={() => { setAgentFilter(f.id); setAgentPropertiesPage(1); }} style={{ padding: '6px 12px', background: agentFilter === f.id ? blue : 'rgba(255,255,255,0.06)', color: agentFilter === f.id ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentFilter === f.id ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
                 {f.label}
               </button>
             ))}
+            <button onClick={() => { setAgentGroupByLandlord(!agentGroupByLandlord); setAgentPropertiesPage(1); }} style={{ padding: '6px 12px', background: agentGroupByLandlord ? blue : 'rgba(255,255,255,0.06)', color: agentGroupByLandlord ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentGroupByLandlord ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              👤 Group by Landlord
+            </button>
             <button onClick={handleAgentExportCSV} style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               📥 Export CSV
             </button>
@@ -3728,48 +3762,96 @@ function App() {
               <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No properties linked yet</p>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Share your invitation link with landlords to get started</p>
             </div>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 80px', gap: '0', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
+          ) : (() => {
+            const renderRow = (property, i, total) => {
+              const score = getHealthScoreD(property.id);
+              const scoreColor = getHealthColor(score);
+              const nextExpiry = getNextExpiryD(property.id);
+              const landlord = getLandlordD(property);
+              const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
+              return (
+                <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 150px', gap: '0', padding: '13px 20px', borderBottom: i < total - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <input type="checkbox" checked={selectedProperties.includes(property.id)} onChange={(e) => { e.stopPropagation(); setSelectedProperties(prev => e.target.checked ? [...prev, property.id] : prev.filter(id => id !== property.id)); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
+                  <div>
+                    <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
+                    <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+                  </div>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.full_name || landlord?.email || '—'}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${scoreColor}20`, border: `2px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: scoreColor, fontWeight: '900', fontSize: '11px' }}>{score}</span>
+                    </div>
+                  </div>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{nextExpiry ? nextExpiry.document_type : '—'}</p>
+                  <div>
+                    {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={(e) => handleQuickEditProperty(property, e)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>✏️</button>
+                    <button onClick={(e) => handleQuickDeleteProperty(property, e)} title="Delete" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>🗑</button>
+                    <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
+                  </div>
+                </div>
+              );
+            };
+
+            const tableHeader = (
+              <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 150px', gap: '0', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
                 {['', 'Property', 'Landlord', 'Score', 'Next Expiry', 'Status', ''].map(h => (
                   <p key={h} style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</p>
                 ))}
               </div>
-              {filteredAndSearched.map((property, i) => {
-                const score = getHealthScoreD(property.id);
-                const scoreColor = getHealthColor(score);
-                const nextExpiry = getNextExpiryD(property.id);
-                const landlord = getLandlordD(property);
-                const status = nextExpiry ? getExpiryStatus(nextExpiry.expiry_date) : null;
-                return (
-                  <div key={property.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 1.5fr 120px 1.5fr 100px 150px', gap: '0', padding: '13px 20px', borderBottom: i < filteredAndSearched.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <input type="checkbox" checked={selectedProperties.includes(property.id)} onChange={(e) => { e.stopPropagation(); setSelectedProperties(prev => e.target.checked ? [...prev, property.id] : prev.filter(id => id !== property.id)); }} style={{ width: '16px', height: '16px', cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
-                    <div>
-                      <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
-                      <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
-                    </div>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.full_name || landlord?.email || '—'}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: `${scoreColor}20`, border: `2px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ color: scoreColor, fontWeight: '900', fontSize: '11px' }}>{score}</span>
-                      </div>
-                    </div>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{nextExpiry ? nextExpiry.document_type : '—'}</p>
-                    <div>
-                      {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
-                      <button onClick={(e) => handleQuickEditProperty(property, e)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>✏️</button>
-                      <button onClick={(e) => handleQuickDeleteProperty(property, e)} title="Delete" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>🗑</button>
-                      <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
-                    </div>
+            );
+
+            return (
+              <>
+                {filteredAndSearched.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '48px 24px', textAlign: 'center' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>No properties match your search or filter.</p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ) : agentGroupByLandlord ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {pagedLandlordGroups.map(group => {
+                      const key = group.landlord?.id || 'unlinked';
+                      const isCollapsed = !!collapsedLandlordGroups[key];
+                      return (
+                        <div key={key} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
+                          <div onClick={() => setCollapsedLandlordGroups(prev => ({ ...prev, [key]: !prev[key] }))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(255,255,255,0.04)', cursor: 'pointer' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▾</span>
+                              <p style={{ margin: 0, color: 'white', fontWeight: '700', fontSize: '14px' }}>👤 {group.landlord?.full_name || group.landlord?.email || 'No landlord linked'}</p>
+                            </div>
+                            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600' }}>{group.properties.length} {group.properties.length === 1 ? 'property' : 'properties'}</span>
+                          </div>
+                          {!isCollapsed && (
+                            <>
+                              {tableHeader}
+                              {group.properties.map((p, i) => renderRow(p, i, group.properties.length))}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
+                    {tableHeader}
+                    {pagedProperties.map((p, i) => renderRow(p, i, pagedProperties.length))}
+                  </div>
+                )}
+
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', marginTop: '18px' }}>
+                    <button onClick={() => setAgentPropertiesPage(p => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '6px 14px', background: 'rgba(255,255,255,0.06)', color: safePage === 1 ? 'rgba(255,255,255,0.25)' : 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: safePage === 1 ? 'default' : 'pointer' }}>← Prev</button>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Page {safePage} of {totalPages}</span>
+                    <button onClick={() => setAgentPropertiesPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '6px 14px', background: 'rgba(255,255,255,0.06)', color: safePage === totalPages ? 'rgba(255,255,255,0.25)' : 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: safePage === totalPages ? 'default' : 'pointer' }}>Next →</button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {/* Ask Mate Widget */}
           <AskAnythingWidget />
 
