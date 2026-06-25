@@ -1012,6 +1012,9 @@ function App() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
+  const [editingAgentEmailInline, setEditingAgentEmailInline] = useState(false);
+  const [agentEmailInlineValue, setAgentEmailInlineValue] = useState('');
+  const [savingAgentEmailInline, setSavingAgentEmailInline] = useState(false);
   const [propertyViewMode, setPropertyViewMode] = useState('tiles'); // 'tiles' or 'list'
   const [editPropertyAddress, setEditPropertyAddress] = useState('');
   const [editPropertyType, setEditPropertyType] = useState('house');
@@ -3959,6 +3962,13 @@ function App() {
       <AppShell screen="properties" setScreen={(s) => { if (s !== 'property') setSelectedProperty(null); setScreen(s); }} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl}>
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => { setSelectedProperty(null); setScreen('properties'); }}>← Back to properties</p>
+
+          {propertyActionMessage && (
+            <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+              <p style={{ margin: 0, color: '#4ade80', fontSize: '13px', fontWeight: '600', lineHeight: '1.5' }}>{propertyActionMessage}</p>
+              <button onClick={() => setPropertyActionMessage(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>✕</button>
+            </div>
+          )}
           
           {/* Property photo */}
           {selectedProperty.photo_url ? (
@@ -3990,6 +4000,53 @@ function App() {
           <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '4px', textTransform: 'capitalize', fontSize: '13px' }}>
             {selectedProperty.property_type}{selectedProperty.country ? ` · ${getCountryFlag(selectedProperty.country)} ${selectedProperty.country}` : ''}
           </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>👤 Letting Agent:</span>
+            {editingAgentEmailInline ? (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input type="email" autoFocus placeholder="agent@example.com" value={agentEmailInlineValue} onChange={e => setAgentEmailInlineValue(e.target.value)} style={{ padding: '6px 10px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.08)', color: 'white', minWidth: '200px' }} />
+                <button disabled={savingAgentEmailInline} onClick={async () => {
+                  const trimmed = agentEmailInlineValue.trim().toLowerCase();
+                  const isNew = trimmed && trimmed !== (selectedProperty.agent_email || '').toLowerCase();
+                  setSavingAgentEmailInline(true);
+                  const { error } = await supabase.from('properties').update({ agent_email: trimmed || null }).eq('id', selectedProperty.id);
+                  if (!error) {
+                    setSelectedProperty({ ...selectedProperty, agent_email: trimmed || null });
+                    setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, agent_email: trimmed || null } : p));
+                    if (isNew) {
+                      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          email: trimmed,
+                          full_name: 'there',
+                          template: 'landlord_linked_agent',
+                          extra: { landlordName: user?.user_metadata?.full_name || 'A landlord', propertyAddress: selectedProperty.address_line_1 },
+                        })
+                      }).catch(() => {});
+                      setPropertyActionMessage(`✓ Linked to ${trimmed} — they've been emailed to let them know.`);
+                    } else if (!trimmed) {
+                      setPropertyActionMessage('✓ Agent link removed.');
+                    } else {
+                      setPropertyActionMessage('✓ Saved.');
+                    }
+                    setTimeout(() => setPropertyActionMessage(null), 6000);
+                  } else {
+                    alert(error.message);
+                  }
+                  setSavingAgentEmailInline(false);
+                  setEditingAgentEmailInline(false);
+                }} style={{ padding: '6px 12px', background: blue, color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>{savingAgentEmailInline ? '...' : 'Save'}</button>
+                <button onClick={() => setEditingAgentEmailInline(false)} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>
+              </div>
+            ) : (
+              <>
+                <span style={{ color: selectedProperty.agent_email ? '#7eb6f5' : 'rgba(255,255,255,0.35)', fontSize: '13px', fontWeight: '600' }}>{selectedProperty.agent_email || 'Not linked yet'}</span>
+                <button onClick={() => { setAgentEmailInlineValue(selectedProperty.agent_email || ''); setEditingAgentEmailInline(true); }} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: '12px', cursor: 'pointer', padding: '2px' }}>✏️</button>
+              </>
+            )}
+          </div>
 
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
             <p style={{ margin: '0 0 6px', fontWeight: '700', color: 'white', fontSize: '14px' }}>🔗 Share with your letting agent</p>
