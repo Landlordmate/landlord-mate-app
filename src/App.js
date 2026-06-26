@@ -52,6 +52,14 @@ const DOC_TYPES = [
 
 const COUNTRIES = ['England', 'Wales', 'Scotland', 'Northern Ireland'];
 
+// Returns true if any property in the given list is in Wales.
+// Properties with no country set yet default to "not Wales" — safer to
+// under-show Welsh-specific content than confuse a non-Welsh landlord.
+function isWalesRelevant(properties) {
+  if (!properties || properties.length === 0) return false;
+  return properties.some(p => p.country === 'Wales');
+}
+
 function getExpiryStatus(expiryDate) {
   if (!expiryDate) return null;
   const today = new Date();
@@ -606,7 +614,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         {navItem('properties', '🏠', 'All Properties')}
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
         {navItem('landlordocs', '🪪', 'My Documents')}
-        {navItem('wales', '🏴󠁧󠁢󠁷󠁬󠁳󠁥', 'Wales Compliance')}
+        {isWalesRelevant(properties) && navItem('wales', '🏴󠁧󠁢󠁷󠁬󠁳󠁥', 'Wales Compliance')}
         {navItem('letters', '📝', 'Letter Templates')}
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>ACCOUNT</p>
         {navItem('settings', '⚙️', 'Settings')}
@@ -643,7 +651,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
   );
 }
 
-function AskAnythingWidget() {
+function AskAnythingWidget({ properties, forceWales }) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -660,7 +668,13 @@ function AskAnythingWidget() {
     return () => clearInterval(interval);
   }, [loading]);
 
-  const suggestions = [
+  // Agents always see the Wales-aware prompt set (they may manage Welsh
+  // landlords even if their own account isn't Welsh) — same rule already
+  // used for the full Ask Mate AI chat. Landlords only see it if at least
+  // one of their properties is in Wales.
+  const showWalesPrompts = forceWales || isWalesRelevant(properties);
+
+  const walesPrompts = [
     'What documents do I need for a Welsh tenancy?',
     'How often does a Gas Safety Certificate need renewing?',
     'What is a Section 173 notice?',
@@ -670,6 +684,19 @@ function AskAnythingWidget() {
     'What is a Written Occupation Contract?',
     'How much notice must I give a tenant in Wales?',
   ];
+
+  const generalPrompts = [
+    'How often does a Gas Safety Certificate need renewing?',
+    'What is an EICR and when do I need one?',
+    'When must I protect a tenancy deposit?',
+    'What is a Section 21 notice?',
+    'Do I need an EPC to let my property?',
+    'What are my responsibilities for smoke alarms?',
+    'What is a Right to Rent check?',
+    'How much notice must I give a tenant in England?',
+  ];
+
+  const suggestions = showWalesPrompts ? walesPrompts : generalPrompts;
 
   const handleAsk = async (q) => {
     const query = q || question;
@@ -701,7 +728,7 @@ function AskAnythingWidget() {
       <div style={{ position: 'relative', marginBottom: '14px' }}>
         <input
           type="text"
-          placeholder="Ask about Gas Safe, EICR, Rent Smart Wales, tenancy law..."
+          placeholder={showWalesPrompts ? "Ask about Gas Safe, EICR, Rent Smart Wales, tenancy law..." : "Ask about Gas Safe, EICR, deposits, tenancy law..."}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleAsk(); }}
@@ -857,7 +884,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
         </button>
       </div>
 
-      <AskAnythingWidget />
+      <AskAnythingWidget properties={properties} />
 
       {properties.length > 0 && (
         <div style={{ marginBottom: '24px', textAlign: 'right' }}>
@@ -3938,7 +3965,7 @@ function App() {
             );
           })()}
           {/* Ask Mate Widget */}
-          <AskAnythingWidget />
+          <AskAnythingWidget forceWales={true} />
 
         </div>
       </div>
