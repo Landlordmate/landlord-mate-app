@@ -633,20 +633,6 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         {navItem('settings', '⚙️', 'Settings')}
         {navItem('faq', '❓', 'Help & FAQs')}
       </div>
-      <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
-        <button onClick={() => {
-          const shareUrl = 'https://app.thelandlordmate.com';
-          const shareText = 'I use The Landlord Mate to manage my property compliance — Gas Safe, EICR, EPC all in one place with automatic reminders. Try it free for 7 days:';
-          if (navigator.share) {
-            navigator.share({ title: 'The Landlord Mate', text: shareText, url: shareUrl });
-          } else {
-            navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-            alert('Link copied! Share it with other landlords.');
-          }
-        }} style={{ width: '100%', padding: '8px 12px', background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '8px', color: blue, fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', textAlign: 'left' }}>
-          🔗 Share with a landlord
-        </button>
-      </div>
       <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: blue, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>
@@ -831,19 +817,36 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
         </div>
         {properties.length > 0 && (
           <button
-            onClick={() => {
-              if (properties.length === 1) {
-                handleSelectProperty(properties[0]);
-              } else {
-                setScreen('properties');
-              }
-            }}
+            onClick={() => setShowAgentShareModal(true)}
             style={{ background: blue, color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
           >
             🔗 Share with your agent
           </button>
         )}
       </div>
+
+      {showAgentShareModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#0f2137', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '28px', maxWidth: '480px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ color: 'white', margin: 0, fontSize: '18px', fontWeight: '800' }}>🔗 Share with your agent</h3>
+              <button onClick={() => setShowAgentShareModal(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', margin: '0 0 20px', lineHeight: 1.6 }}>
+              The best way to share with your agent is to add their email address directly on each property. They'll get full, permanent visibility of your compliance documents automatically.
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 16px' }}>Choose a property to add your agent's email or generate a one-off share link:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', marginBottom: '20px' }}>
+              {properties.map(p => (
+                <button key={p.id} onClick={() => { setShowAgentShareModal(false); handleSelectProperty(p); setScreen('properties'); }} style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', fontSize: '13px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
+                  🏠 {p.address_line_1}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowAgentShareModal(false)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {showHomeBanner && <HomeScreenBanner onDismiss={onDismissBanner} />}
       {showTrialNudge && <TrialNudgeBanner daysLeft={trialDaysLeft} onSubscribe={onSubscribe} />}
@@ -1078,6 +1081,8 @@ function App() {
   const [reminderDays, setReminderDays] = useState(null);
   const [reminderDaysSaved, setReminderDaysSaved] = useState(false);
   const [calendarLinkCopied, setCalendarLinkCopied] = useState(false);
+  const [showAgentShareModal, setShowAgentShareModal] = useState(false);
+  const [agentShareCopied, setAgentShareCopied] = useState(false);
   const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
   const [settingsNewPassword, setSettingsNewPassword] = useState('');
   const [settingsPasswordMsg, setSettingsPasswordMsg] = useState('');
@@ -1350,7 +1355,11 @@ function App() {
       fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userRow.email, full_name: fullName })
+        body: JSON.stringify({
+          email: userRow.email,
+          full_name: fullName,
+          template: 'welcome'
+        })
       }).catch(() => {});
     }
   };
