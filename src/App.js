@@ -5057,17 +5057,17 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>{isSubscribed ? 'Active Subscription' : `Free Trial — ${trialStatus.daysLeft} days left`}</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>{isSubscribed ? 'Your subscription is active.' : 'Upgrade to keep access after your trial ends.'}</p>
+                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>{userRecord?.lifetime_access ? 'Lifetime Access' : isSubscribed ? 'Active Subscription' : `Free Trial — ${trialStatus.daysLeft} days left`}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>{userRecord?.lifetime_access ? 'You have permanent access to every feature, no billing involved.' : isSubscribed ? 'Your subscription is active.' : 'Upgrade to keep access after your trial ends.'}</p>
               </div>
-              <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{isSubscribed ? '✓ Active' : 'Trial'}</span>
+              <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{userRecord?.lifetime_access ? '✓ Lifetime' : isSubscribed ? '✓ Active' : 'Trial'}</span>
             </div>
             {!isSubscribed && (
               <button onClick={() => setForcePaywall(true)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
                 {subscribing ? 'Loading…' : 'Choose a plan'}
               </button>
             )}
-            {isSubscribed && (
+            {isSubscribed && !userRecord?.lifetime_access && (
               <button onClick={handleManageSubscription} disabled={portalLoading} style={{ marginTop: '14px', padding: '10px 20px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: portalLoading ? 0.7 : 1 }}>
                 {portalLoading ? 'Loading…' : 'Manage subscription'}
               </button>
