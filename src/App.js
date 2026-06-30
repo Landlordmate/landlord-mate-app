@@ -1075,6 +1075,8 @@ function App() {
   const [settingsName, setSettingsName] = useState('');
   const [settingsNameSaved, setSettingsNameSaved] = useState(false);
   const [settingsNameError, setSettingsNameError] = useState('');
+  const [reminderDays, setReminderDays] = useState(null);
+  const [reminderDaysSaved, setReminderDaysSaved] = useState(false);
   const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
   const [settingsNewPassword, setSettingsNewPassword] = useState('');
   const [settingsPasswordMsg, setSettingsPasswordMsg] = useState('');
@@ -2157,6 +2159,19 @@ function App() {
 
   // New: landlord-side portfolio export, didn't exist before, mirrors the agent
   // version above. Portfolio tier only.
+  // New: lets Pro+ landlords customise which day-thresholds they get reminded at,
+  // instead of everyone being stuck on the fixed 90/60/30/14/7 default.
+  const handleSaveReminderDays = async (days) => {
+    if (!meetsTier('pro')) { tierGateAlert('Custom reminder schedules', 'pro'); return; }
+    if (!days || days.length === 0) { alert('Please keep at least one reminder day selected.'); return; }
+    const sorted = [...days].sort((a, b) => b - a);
+    setReminderDays(sorted);
+    await supabase.from('users').update({ reminder_days: sorted }).eq('id', user.id);
+    setUserRecord(prev => prev ? { ...prev, reminder_days: sorted } : prev);
+    setReminderDaysSaved(true);
+    setTimeout(() => setReminderDaysSaved(false), 2000);
+  };
+
   const handleLandlordExportCSV = () => {
     if (!meetsTier('portfolio')) { tierGateAlert('CSV portfolio export', 'portfolio'); return; }
     const rows = [['Property', 'Type', 'Country', 'Health', 'Documents', 'Next Expiry']];
@@ -5068,6 +5083,45 @@ function App() {
               <button onClick={handleLandlordExportCSV} style={{ padding: '10px 20px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>📥 Export CSV</button>
             ) : (
               <button onClick={() => tierGateAlert('CSV portfolio export', 'portfolio')} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🔒 Export CSV — Portfolio plan</button>
+            )}
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>REMINDER SCHEDULE</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Certificate Expiry Reminders</p>
+            {meetsTier('pro') ? (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 14px' }}>Choose which days before expiry you'd like to be emailed. We always email on the expiry day itself and again 7 days after if nothing's been renewed.</p>
+                {(() => {
+                  const current = reminderDays || userRecord?.reminder_days || [90, 60, 30, 14, 7];
+                  const options = [90, 60, 30, 14, 7, 3, 1];
+                  return (
+                    <>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                        {options.map(d => {
+                          const active = current.includes(d);
+                          return (
+                            <button
+                              key={d}
+                              onClick={() => {
+                                const next = active ? current.filter(x => x !== d) : [...current, d];
+                                handleSaveReminderDays(next);
+                              }}
+                              style={{ padding: '8px 16px', borderRadius: '8px', border: active ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: active ? '#22c55e' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}
+                            >{d} day{d === 1 ? '' : 's'}</button>
+                          );
+                        })}
+                      </div>
+                      {reminderDaysSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: 0 }}>✓ Saved</p>}
+                    </>
+                  );
+                })()}
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>You're reminded at the standard 90, 60, 30, 14 and 7 day marks before any certificate expires.</p>
+                <button onClick={() => tierGateAlert('Custom reminder schedules', 'pro')} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🔒 Customise — Pro plan</button>
+              </>
             )}
           </div>
 
