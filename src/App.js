@@ -1196,6 +1196,20 @@ function App() {
   const trialExpired = trialStatus.expired && !isSubscribed;
   const showTrialNudge = !trialStatus.expired && trialStatus.daysLeft <= 4 && !isSubscribed;
 
+  // ---- Tier gating helpers ----
+  // Plan property limits, mirrors pricing copy on the landing page and paywall screens.
+  const LANDLORD_PROPERTY_LIMITS = { starter: 3, pro: 10, portfolio: Infinity };
+  const AGENT_PROPERTY_LIMITS = { starter: 50, pro: 200, portfolio: Infinity };
+  const TIER_RANK = { starter: 0, pro: 1, portfolio: 2 };
+  const myTier = (userRecord?.subscription_tier || 'starter').toLowerCase();
+  // True if the current user's plan is at or above `required` ('pro' or 'portfolio').
+  const meetsTier = (required) => (TIER_RANK[myTier] ?? 0) >= (TIER_RANK[required] ?? 0);
+  // Friendly alert shown when a gated feature is used below its required tier.
+  const tierGateAlert = (featureName, required) => {
+    const planLabel = required === 'portfolio' ? 'Portfolio' : 'Pro';
+    alert(`${featureName} is available on the ${planLabel} plan and above. You can upgrade any time from Settings.`);
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -1965,6 +1979,12 @@ function App() {
       return;
     }
 
+    const agentPropLimit = AGENT_PROPERTY_LIMITS[myTier] ?? AGENT_PROPERTY_LIMITS.starter;
+    if (agentProperties.length >= agentPropLimit) {
+      setAgentAddPropertyError(`Your ${myTier.charAt(0).toUpperCase() + myTier.slice(1)} plan allows up to ${agentPropLimit} properties. Upgrade your plan in Settings to add more.`);
+      return;
+    }
+
     setAgentAddPropertySaving(true);
     setAgentAddPropertyError('');
     setAgentAddPropertyMessage(null);
@@ -2094,6 +2114,7 @@ function App() {
 
   const handleBulkChase = async () => {
     if (selectedProperties.length === 0) return;
+    if (!meetsTier('pro')) { tierGateAlert('Bulk chasing landlords', 'pro'); return; }
     setBulkChasing(true);
     setBulkChaseResult('');
     let sent = 0;
@@ -2121,7 +2142,32 @@ function App() {
     setBulkChasing(false);
   };
 
+  // New: landlord-side portfolio export, didn't exist before, mirrors the agent
+  // version above. Portfolio tier only.
+  const handleLandlordExportCSV = () => {
+    if (!meetsTier('portfolio')) { tierGateAlert('CSV portfolio export', 'portfolio'); return; }
+    const rows = [['Property', 'Type', 'Country', 'Health', 'Documents', 'Next Expiry']];
+    properties.forEach(p => {
+      const docs = (allDocuments || []).filter(d => d.property_id === p.id);
+      const expired = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
+      const urgent = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
+      const soon = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
+      const health = expired || urgent ? 'Action Needed' : soon ? 'Expiring Soon' : docs.length === 0 ? 'No Documents' : 'Compliant';
+      const nextDoc = docs.filter(d => d.expiry_date).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
+      rows.push([p.address_line_1, p.property_type || '—', p.country || '—', health, docs.length, nextDoc ? `${nextDoc.document_type} (${new Date(nextDoc.expiry_date).toLocaleDateString('en-GB')})` : '—']);
+    });
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my-portfolio-compliance-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleAgentExportCSV = () => {
+    if (!meetsTier('portfolio')) { tierGateAlert('CSV portfolio export', 'portfolio'); return; }
     const rows = [['Property', 'Landlord', 'Country', 'Health', 'Documents', 'Next Expiry']];
     agentProperties.forEach(p => {
       const docs = agentDocuments.filter(d => d.property_id === p.id);
@@ -2417,6 +2463,11 @@ function App() {
     const alreadyExists = properties.some(p => (p.address_line_1 || '').toLowerCase().trim() === newAddress.toLowerCase().trim());
     if (alreadyExists) {
       alert('This property is already in your account — your agent may have already added it for you. Check your properties list.');
+      return;
+    }
+    const propLimit = LANDLORD_PROPERTY_LIMITS[myTier] ?? LANDLORD_PROPERTY_LIMITS.starter;
+    if (properties.length >= propLimit) {
+      alert(`Your ${myTier.charAt(0).toUpperCase() + myTier.slice(1)} plan allows up to ${propLimit} propert${propLimit === 1 ? 'y' : 'ies'}. Upgrade your plan in Settings to add more.`);
       return;
     }
     const agentEmailTrimmed = newAgentEmail.trim().toLowerCase();
@@ -3118,7 +3169,7 @@ function App() {
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => { const w = window.open('', '_blank'); const today = new Date().toLocaleDateString('en-GB'); w.document.write(`<html><head><title>Compliance Report - ${selectedAgentProperty.address_line_1}</title><style>body{font-family:Georgia,serif;padding:40px;max-width:800px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px;border-bottom:2px solid #0f1e30;padding-bottom:6px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#0f1e30;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}.green{color:#22c55e;font-weight:700}.red{color:#ef4444;font-weight:700}.amber{color:#eab308;font-weight:700}.footer{margin-top:40px;font-size:11px;color:#999;border-top:1px solid #e2e8f0;padding-top:12px}</style></head><body><h1>${selectedAgentProperty.address_line_1}</h1><p style="color:#666;font-size:13px">${selectedAgentProperty.property_type}${selectedAgentProperty.country ? ' · ' + selectedAgentProperty.country : ''} · Report generated ${today}</p><p style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 14px;border-radius:6px;font-size:13px">Compliance Health Score: <strong style="color:${propScore >= 80 ? '#22c55e' : propScore >= 50 ? '#eab308' : '#ef4444'}">${propScore}/100</strong></p><h2>Compliance Documents</h2><table><tr><th>Document</th><th>Expiry Date</th><th>Status</th><th>Days Remaining</th></tr>${selectedAgentPropertyDocs.map(doc => { const s = getExpiryStatus(doc.expiry_date); const cls = s?.type === 'good' ? 'green' : s?.type === 'expired' ? 'red' : 'amber'; return `<tr><td>${doc.document_type}</td><td>${doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-GB') : 'No date'}</td><td class="${cls}">${s?.label || 'No date set'}</td><td class="${cls}">${s?.label || '—'}</td></tr>`; }).join('')}</table><div class="footer">Generated by The Landlord Mate for ${userRecord?.agency_name || 'your agency'} · thelandlordmate.com · ${today}</div></body></html>`); w.print(); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                <button onClick={() => { if (!meetsTier('pro')) { tierGateAlert('Compliance Report PDFs', 'pro'); return; } const w = window.open('', '_blank'); const today = new Date().toLocaleDateString('en-GB'); w.document.write(`<html><head><title>Compliance Report - ${selectedAgentProperty.address_line_1}</title><style>body{font-family:Georgia,serif;padding:40px;max-width:800px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin:24px 0 12px;border-bottom:2px solid #0f1e30;padding-bottom:6px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#0f1e30;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:13px}.green{color:#22c55e;font-weight:700}.red{color:#ef4444;font-weight:700}.amber{color:#eab308;font-weight:700}.footer{margin-top:40px;font-size:11px;color:#999;border-top:1px solid #e2e8f0;padding-top:12px}</style></head><body><h1>${selectedAgentProperty.address_line_1}</h1><p style="color:#666;font-size:13px">${selectedAgentProperty.property_type}${selectedAgentProperty.country ? ' · ' + selectedAgentProperty.country : ''} · Report generated ${today}</p><p style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px 14px;border-radius:6px;font-size:13px">Compliance Health Score: <strong style="color:${propScore >= 80 ? '#22c55e' : propScore >= 50 ? '#eab308' : '#ef4444'}">${propScore}/100</strong></p><h2>Compliance Documents</h2><table><tr><th>Document</th><th>Expiry Date</th><th>Status</th><th>Days Remaining</th></tr>${selectedAgentPropertyDocs.map(doc => { const s = getExpiryStatus(doc.expiry_date); const cls = s?.type === 'good' ? 'green' : s?.type === 'expired' ? 'red' : 'amber'; return `<tr><td>${doc.document_type}</td><td>${doc.expiry_date ? new Date(doc.expiry_date).toLocaleDateString('en-GB') : 'No date'}</td><td class="${cls}">${s?.label || 'No date set'}</td><td class="${cls}">${s?.label || '—'}</td></tr>`; }).join('')}</table><div class="footer">Generated by The Landlord Mate for ${userRecord?.agency_name || 'your agency'} · thelandlordmate.com · ${today}</div></body></html>`); w.print(); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
                   🖨️ Compliance Report
                 </button>
                 <div style={{ textAlign: 'center' }}>
@@ -4984,6 +5035,17 @@ function App() {
               </button>
             )}
             {portalError && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700', margin: '10px 0 0' }}>⚠ {portalError}</p>}
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>MY DATA</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Export Portfolio (CSV)</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>Download a spreadsheet of all your properties, their compliance status and next expiry dates.</p>
+            {meetsTier('portfolio') ? (
+              <button onClick={handleLandlordExportCSV} style={{ padding: '10px 20px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>📥 Export CSV</button>
+            ) : (
+              <button onClick={() => tierGateAlert('CSV portfolio export', 'portfolio')} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🔒 Export CSV — Portfolio plan</button>
+            )}
           </div>
 
           <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>NOTIFICATIONS</p>
