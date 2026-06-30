@@ -377,7 +377,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       desc: 'Most popular',
       color: '#7c3aed',
       highlight: true,
-      features: ['Everything in Starter', 'Room to grow your portfolio'],
+      features: ['Everything in Starter', 'Custom reminder schedules'],
     },
     {
       key: 'portfolio',
