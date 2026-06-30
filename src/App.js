@@ -1077,6 +1077,7 @@ function App() {
   const [settingsNameError, setSettingsNameError] = useState('');
   const [reminderDays, setReminderDays] = useState(null);
   const [reminderDaysSaved, setReminderDaysSaved] = useState(false);
+  const [calendarLinkCopied, setCalendarLinkCopied] = useState(false);
   const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
   const [settingsNewPassword, setSettingsNewPassword] = useState('');
   const [settingsPasswordMsg, setSettingsPasswordMsg] = useState('');
@@ -5121,6 +5122,34 @@ function App() {
               <>
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>You're reminded at the standard 90, 60, 30, 14 and 7 day marks before any certificate expires.</p>
                 <button onClick={() => tierGateAlert('Custom reminder schedules', 'pro')} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🔒 Customise — Pro plan</button>
+              </>
+            )}
+          </div>
+
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', margin: '20px 0 10px' }}>CALENDAR SYNC</p>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
+            <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>Sync Expiry Dates to Your Calendar</p>
+            {meetsTier('pro') ? (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 14px' }}>Add this link to Google Calendar or Apple Calendar and every certificate expiry shows up automatically, alongside the rest of your life.</p>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                  <input
+                    readOnly
+                    value={`https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`}
+                    onClick={(e) => e.target.select()}
+                    style={{ flex: 1, padding: '10px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'monospace' }}
+                  />
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(`https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`); setCalendarLinkCopied(true); setTimeout(() => setCalendarLinkCopied(false), 2000); }}
+                    style={{ padding: '10px 16px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >{calendarLinkCopied ? '✓ Copied' : 'Copy link'}</button>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', margin: 0 }}>In Google Calendar: Other calendars → + → From URL. In Apple Calendar: File → New Calendar Subscription.</p>
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 12px' }}>See every certificate expiry right in Google or Apple Calendar, no separate app needed.</p>
+                <button onClick={() => tierGateAlert('Calendar sync', 'pro')} style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>🔒 Sync calendar — Pro plan</button>
               </>
             )}
           </div>
