@@ -769,7 +769,7 @@ function AskAnythingWidget({ properties, forceWales }) {
 }
 
 function Dashboard({ properties, documents, setScreen, setSelectedProperty, handleSelectProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport }) {
-  const [showAgentShareModal, setShowAgentShareModal] = React.useState(false);
+  const [showAgentShareModal, setShowAgentShareModal] = useState(false);
   const byExpirySoonest = (a, b) => new Date(a.expiry_date) - new Date(b.expiry_date);
   const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').sort(byExpirySoonest);
   const urgentDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').sort(byExpirySoonest);
