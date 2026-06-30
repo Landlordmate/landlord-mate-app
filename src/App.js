@@ -1207,7 +1207,7 @@ function App() {
   const isMobile = useIsMobile();
 
   const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 14 };
-  const isSubscribed = userRecord?.subscription_status === 'active';
+  const isSubscribed = userRecord?.subscription_status === 'active' || userRecord?.lifetime_access === true;
   const trialExpired = trialStatus.expired && !isSubscribed;
   const showTrialNudge = !trialStatus.expired && trialStatus.daysLeft <= 4 && !isSubscribed;
 
@@ -1216,7 +1216,7 @@ function App() {
   const LANDLORD_PROPERTY_LIMITS = { starter: 3, pro: 10, portfolio: Infinity };
   const AGENT_PROPERTY_LIMITS = { starter: 50, pro: 200, portfolio: Infinity };
   const TIER_RANK = { starter: 0, pro: 1, portfolio: 2 };
-  const myTier = (userRecord?.subscription_tier || 'starter').toLowerCase();
+  const myTier = userRecord?.lifetime_access ? 'portfolio' : (userRecord?.subscription_tier || 'starter').toLowerCase();
   // True if the current user's plan is at or above `required` ('pro' or 'portfolio').
   const meetsTier = (required) => (TIER_RANK[myTier] ?? 0) >= (TIER_RANK[required] ?? 0);
   // Friendly alert shown when a gated feature is used below its required tier.
@@ -1282,7 +1282,7 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname);
       // Send payment confirmation email
       if (user?.email) {
-        const planName = userRecord?.account_type === 'agent' ? 'Agent Plan' : `${userRecord?.subscription_tier || 'Starter'} Plan`;
+        const planName = userRecord?.lifetime_access ? 'Lifetime Access' : (userRecord?.account_type === 'agent' ? 'Agent Plan' : `${userRecord?.subscription_tier || 'Starter'} Plan`);
         fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2899,7 +2899,7 @@ function App() {
   if (user && userRecord?.account_type === 'agent') {
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
     const agentTrialStatus = getTrialStatus(userRecord?.trial_ends_at);
-    const agentIsSubscribed = userRecord?.subscription_status === 'active';
+    const agentIsSubscribed = userRecord?.subscription_status === 'active' || userRecord?.lifetime_access === true;
     const agentTrialExpired = agentTrialStatus.expired && !agentIsSubscribed;
 
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 3);
