@@ -366,6 +366,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       properties: '1-3 properties',
       desc: 'Perfect for small landlords',
       color: blue,
+      features: ['AI document scanning', 'Automatic expiry reminders', 'Secure document storage'],
     },
     {
       key: 'pro',
@@ -376,6 +377,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       desc: 'Most popular',
       color: '#7c3aed',
       highlight: true,
+      features: ['Everything in Starter', 'Room to grow your portfolio'],
     },
     {
       key: 'portfolio',
@@ -385,6 +387,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       properties: 'Unlimited properties',
       desc: 'Serious portfolio landlords',
       color: '#059669',
+      features: ['Everything in Pro', 'CSV portfolio export', 'Priority support'],
     },
   ];
 
@@ -467,7 +470,17 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
                   {displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{period}</span>
                 </p>
                 {annualEquiv && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: '2px 0 4px' }}>{annualEquiv}</p>}
-                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 16px' }}>{plan.properties}</p>
+                {plan.features && plan.features.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    {plan.features.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '6px' }}>
+                        <span style={{ color: plan.color, fontSize: '12px', lineHeight: '18px' }}>✓</span>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: '18px' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={() => onSubscribe(getPriceId(plan))}
                   disabled={subscribing}
@@ -2937,9 +2950,9 @@ function App() {
             </div>
             <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
               {[
-                { key: 'agent_starter', name: 'Agent Starter', annualPrice: 499, monthlyPrice: 49.90, properties: 'Up to 50 properties', color: blue },
-                { key: 'agent_pro', name: 'Agent Pro', annualPrice: 999, monthlyPrice: 99.90, properties: 'Up to 200 properties', color: '#7c3aed', highlight: true },
-                { key: 'agent_portfolio', name: 'Agent Portfolio', annualPrice: 1999, monthlyPrice: 199.90, properties: 'Unlimited properties', color: '#059669' },
+                { key: 'agent_starter', name: 'Agent Starter', annualPrice: 499, monthlyPrice: 49.90, properties: 'Up to 50 properties', color: blue, features: ['Agency dashboard', 'Landlord invitation links', 'Compliance tracking'] },
+                { key: 'agent_pro', name: 'Agent Pro', annualPrice: 999, monthlyPrice: 99.90, properties: 'Up to 200 properties', color: '#7c3aed', highlight: true, features: ['Everything in Starter', 'Bulk landlord chasing', 'Compliance report PDFs'] },
+                { key: 'agent_portfolio', name: 'Agent Portfolio', annualPrice: 1999, monthlyPrice: 199.90, properties: 'Unlimited properties', color: '#059669', features: ['Everything in Pro', 'CSV portfolio export', 'Priority support'] },
               ].map(plan => {
                 const displayPrice = agentBilling === 'annual' ? `£${plan.annualPrice}` : `£${plan.monthlyPrice.toFixed(2)}`;
                 const period = agentBilling === 'annual' ? '/year' : '/month';
@@ -2950,7 +2963,17 @@ function App() {
                   <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '800', letterSpacing: '2px', margin: '0 0 8px' }}>{plan.name.toUpperCase()}</p>
                   <p style={{ color: 'white', fontWeight: '900', fontSize: '32px', margin: '0 0 2px', lineHeight: 1 }}>{displayPrice}<span style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{period}</span></p>
                   {annualEquiv && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: '2px 0 4px' }}>{annualEquiv}</p>}
-                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 20px' }}>{plan.properties}</p>
+                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', margin: '0 0 16px' }}>{plan.properties}</p>
+                  {plan.features && plan.features.length > 0 && (
+                    <div style={{ marginBottom: '20px' }}>
+                      {plan.features.map((f, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: '6px' }}>
+                          <span style={{ color: plan.color, fontSize: '12px', lineHeight: '18px' }}>✓</span>
+                          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: '18px' }}>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <button onClick={() => handleSubscribe(PRICE_IDS[plan.key][agentBilling])} disabled={subscribing} style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}>
                     {subscribing ? 'Loading…' : `Choose ${plan.name}`}
                   </button>
