@@ -2804,21 +2804,10 @@ function App() {
   }
 
   // Hard paywall — trial expired and not subscribed
+  // Note: trial-expired email is handled server-side by email-lifecycle-cron (day7_expired),
+  // which is more reliable than this client-side trigger (proper database dedup vs localStorage,
+  // and fires even if the person never logs back in to trigger this screen).
   if (user && trialExpired) {
-    // Send trial expired email once
-    if (!localStorage.getItem(`tlm_trial_expired_email_${user.id}`)) {
-      localStorage.setItem(`tlm_trial_expired_email_${user.id}`, 'sent');
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          full_name: user.user_metadata?.full_name || 'Landlord',
-          subject: 'Your Landlord Mate trial has ended — your documents are safe',
-          message: `Your 7-day free trial has ended.\n\nDon't worry — your documents are safely stored and waiting for you.\n\nSubscribe from just £149/year to keep full access to:\n• All your stored compliance documents\n• Automatic expiry reminders\n• Agent sharing links\n• Letter templates and more\n\nLog in and choose a plan: https://app.thelandlordmate.com\n\nIf you have any questions, reply to this email — we're here to help.\n\nSupport: thelandlordmate@gmail.com\n\nThe Landlord Mate Team`
-        })
-      }).catch(() => {});
-    }
     return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
   }
 
