@@ -576,6 +576,7 @@ function AgentView({ token }) {
 function BottomNav({ activeScreen, setScreen }) {
   const items = [
     { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+    { id: 'askmate', icon: '💬', label: 'Ask Mate' },
     { id: 'properties', icon: '🏠', label: 'Properties' },
     { id: 'landlordocs', icon: '🪪', label: 'My Docs' },
     { id: 'letters', icon: '📝', label: 'Letters' },
@@ -624,6 +625,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
       <div style={{ padding: '16px 0', flex: 1 }}>
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', marginBottom: '8px' }}>OVERVIEW</p>
         {navItem('dashboard', '📊', 'Dashboard', urgentCount)}
+        {navItem('askmate', '💬', 'Ask Mate')}
         {navItem('properties', '🏠', 'All Properties')}
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
         {navItem('landlordocs', '🪪', 'My Documents')}
@@ -706,7 +708,7 @@ function AskAnythingWidget({ properties, forceWales }) {
       const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
-        body: JSON.stringify({ question: query })
+        body: JSON.stringify({ question: query, isWales: showWalesPrompts })
       });
       const data = await res.json();
       setAnswer(data.answer || 'Sorry, I could not get an answer. Please try again.');
@@ -3718,6 +3720,8 @@ function App() {
 
           {agentDemoMode && <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: '#f59e0b', fontWeight: '700', fontSize: '13px' }}>👁 Demo Mode — showing sample portfolio data. Click "Demo ON" to return to your live data.</span></div>}
 
+          <AskAnythingWidget forceWales={true} />
+
           {/* Work Queue — Heart Attack Dashboard */}
           {(workQueue.expired.length > 0 || workQueue.urgent.length > 0) && (
             <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
@@ -4518,6 +4522,86 @@ function App() {
             </div>
           )}
           {!showUpload && <button onClick={() => setShowUpload(true)} style={{ ...primaryBtn, marginTop: '8px' }}>+ Upload Document</button>}
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (user && screen === 'askmate') {
+    const chatWalesRelevant = isWalesRelevant(properties) || userRecord?.account_type === 'agent';
+    const chatPrompts = chatWalesRelevant ? [
+      'What documents do I need for a Welsh tenancy?',
+      'What is a Section 173 notice?',
+      'What is Rent Smart Wales?',
+      'What is a Written Occupation Contract?',
+    ] : [
+      'How often does a Gas Safety Certificate need renewing?',
+      'What is an EICR and when do I need one?',
+      'When must I protect a tenancy deposit?',
+      'What is a Section 21 notice?',
+    ];
+    return (
+      <AppShell screen="askmate" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
+        <div style={{ padding: isMobile ? '20px 16px 90px' : '32px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 'calc(100vh - 72px)' : '100vh', boxSizing: 'border-box' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Instant answers on landlord law and compliance, with memory of your conversation.</p>
+          </div>
+
+          <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', marginBottom: '16px', minHeight: '300px' }}>
+            {aiHistory.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', marginBottom: '18px' }}>Ask me anything about landlord compliance, or try one of these:</p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {chatPrompts.map((s, i) => (
+                    <button key={i} onClick={() => { setAiQuestion(s); }} style={{ background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', color: '#7db3e8', padding: '8px 14px', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {aiHistory.map((m, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                <div style={{
+                  maxWidth: '75%', padding: '10px 16px', borderRadius: '16px', fontSize: '13px', lineHeight: '1.6', fontFamily: font,
+                  background: m.role === 'user' ? blue : 'rgba(255,255,255,0.07)',
+                  color: m.role === 'user' ? 'white' : 'rgba(255,255,255,0.85)',
+                  borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
+                  borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {aiLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '10px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font }}>
+                  Thinking...
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder={chatWalesRelevant ? "Ask about Gas Safe, EICR, Rent Smart Wales, tenancy law..." : "Ask about Gas Safe, EICR, deposits, tenancy law..."}
+              value={aiQuestion}
+              onChange={(e) => setAiQuestion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAskAI(); }}
+              style={{ width: '100%', padding: '16px 56px 16px 20px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(43,124,211,0.4)', borderRadius: '50px', color: 'white', fontSize: '15px', fontFamily: font, outline: 'none', boxSizing: 'border-box' }}
+            />
+            <button
+              onClick={() => handleAskAI()}
+              disabled={aiLoading || !aiQuestion.trim()}
+              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', background: blue, color: 'white', border: 'none', borderRadius: '50%', fontSize: '16px', cursor: aiLoading || !aiQuestion.trim() ? 'not-allowed' : 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {aiLoading ? '⋯' : '↑'}
+            </button>
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '10px', textAlign: 'center' }}>Ask Mate can make mistakes. Always seek professional advice for specific situations.</p>
         </div>
       </AppShell>
     );
