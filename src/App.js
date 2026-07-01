@@ -2208,25 +2208,72 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleAgentExportCSV = () => {
+  const handleAgentExportCSV = (landlordId = null) => {
     if (!meetsTier('portfolio')) { tierGateAlert('CSV portfolio export', 'portfolio'); return; }
     const rows = [['Property', 'Landlord', 'Country', 'Health', 'Documents', 'Next Expiry']];
-    agentProperties.forEach(p => {
-      const docs = agentDocuments.filter(d => d.property_id === p.id);
+
+    const scoreFor = (propertyId) => {
+      const docs = agentDocuments.filter(d => d.property_id === propertyId);
+      if (docs.length === 0) return 0;
+      let score = 100;
+      docs.forEach(doc => {
+        const status = getExpiryStatus(doc.expiry_date);
+        if (!status) return;
+        if (status.type === 'expired') score -= 50;
+        else if (status.type === 'urgent') score -= 25;
+        else if (status.type === 'soon') score -= 10;
+      });
+      return Math.max(0, score);
+    };
+
+    let baseProperties;
+    let exportLabel = userRecord?.agency_name || 'portfolio';
+
+    if (landlordId) {
+      // Export just this one landlord, ignores any active dashboard search/filter, always their full portfolio.
+      baseProperties = agentProperties.filter(p => p.user_id === landlordId);
+      const landlord = agentLandlords.find(l => l.id === landlordId);
+      exportLabel = (landlord?.full_name || landlord?.email || 'landlord').replace(/[^a-z0-9]+/gi, '-');
+    } else {
+      // Full export: matches whatever is currently searched/filtered on the dashboard, so what you see is what you get.
+      baseProperties = agentProperties.filter(p => {
+        const landlord = agentLandlords.find(l => l.id === p.user_id);
+        const score = scoreFor(p.id);
+        const matchesSearch = !agentSearch || p.address_line_1.toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.email || '').toLowerCase().includes(agentSearch.toLowerCase()) || (landlord?.full_name || '').toLowerCase().includes(agentSearch.toLowerCase());
+        const matchesFilter = agentFilter === 'all' || (agentFilter === 'red' && score < 50) || (agentFilter === 'amber' && score >= 50 && score < 80) || (agentFilter === 'green' && score >= 80) || (agentFilter === 'none' && agentDocuments.filter(d => d.property_id === p.id).length === 0);
+        return matchesSearch && matchesFilter;
+      });
+    }
+
+    const sortedProperties = [...baseProperties].sort((a, b) => {
+      const landlordA = (agentLandlords.find(l => l.id === a.user_id)?.full_name || agentLandlords.find(l => l.id === a.user_id)?.email || 'zzz_no_landlord').toLowerCase();
+      const landlordB = (agentLandlords.find(l => l.id === b.user_id)?.full_name || agentLandlords.find(l => l.id === b.user_id)?.email || 'zzz_no_landlord').toLowerCase();
+      if (landlordA !== landlordB) return landlordA.localeCompare(landlordB);
+      return (a.address_line_1 || '').toLowerCase().localeCompare((b.address_line_1 || '').toLowerCase());
+    });
+
+    let lastLandlordKey = null;
+    sortedProperties.forEach(p => {
       const landlord = agentLandlords.find(l => l.id === p.user_id);
+      const landlordKey = landlord?.id || 'no_landlord';
+      if (!landlordId && lastLandlordKey !== null && landlordKey !== lastLandlordKey) {
+        rows.push(['', '', '', '', '', '']);
+      }
+      lastLandlordKey = landlordKey;
+      const docs = agentDocuments.filter(d => d.property_id === p.id);
       const expired = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'expired');
       const urgent = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'urgent');
       const soon = docs.some(d => getExpiryStatus(d.expiry_date)?.type === 'soon');
       const health = expired || urgent ? 'Action Needed' : soon ? 'Expiring Soon' : docs.length === 0 ? 'No Documents' : 'Compliant';
       const nextDoc = docs.filter(d => d.expiry_date).sort((a,b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0];
-      rows.push([p.address_line_1, landlord?.email || '—', p.country || '—', health, docs.length, nextDoc ? `${nextDoc.document_type} (${new Date(nextDoc.expiry_date).toLocaleDateString('en-GB')})` : '—']);
+      rows.push([p.address_line_1, landlord?.full_name || landlord?.email || '—', p.country || '—', health, docs.length, nextDoc ? `${nextDoc.document_type} (${new Date(nextDoc.expiry_date).toLocaleDateString('en-GB')})` : '—']);
     });
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${userRecord?.agency_name || 'portfolio'}-compliance-export.csv`;
+    a.download = `${exportLabel}-compliance-export.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -3582,7 +3629,7 @@ function App() {
         { q: 'How do message templates work?', a: 'Go to Templates to create and manage your message templates. When you click on a property and go to the Message tab, you can send any template to the landlord. The [property_address], [expiry_date] and [agency_name] placeholders are automatically filled in.' },
         { q: 'What does the Work Queue show?', a: 'The Work Queue at the top of your dashboard shows properties that need immediate attention — expired certificates in red, documents expiring within 30 days in amber, and those expiring within 90 days in yellow.' },
         { q: 'Can landlords see my agent notes?', a: 'No — agent notes are completely private. Only you and other agents in your account can see notes added in the Notes tab. Landlords have no visibility of them.' },
-        { q: 'How do I export my portfolio?', a: 'Click the Export CSV button on your dashboard. This downloads a spreadsheet of all your properties with their compliance status, health scores and next expiry dates.' },
+        { q: 'How do I export my portfolio?', a: 'Click the Export CSV button on your dashboard. This exports whatever properties currently match your search and filter, grouped by landlord, with their compliance status, document count and next expiry date. Clear your search and filter first if you want everyone. Want just one landlord? Turn on "Group by Landlord" and click Export next to their name instead.' },
         { q: 'How do I get help?', a: 'Email thelandlordmate@gmail.com and we will respond within 24 hours Monday to Friday.' },
       ];
       return (
@@ -4037,7 +4084,14 @@ function App() {
                               <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▾</span>
                               <p style={{ margin: 0, color: 'white', fontWeight: '700', fontSize: '14px' }}>👤 {group.landlord?.full_name || group.landlord?.email || 'No landlord linked'}</p>
                             </div>
-                            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600' }}>{group.properties.length} {group.properties.length === 1 ? 'property' : 'properties'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600' }}>{group.properties.length} {group.properties.length === 1 ? 'property' : 'properties'}</span>
+                              {group.landlord?.id && (
+                                <button onClick={(e) => { e.stopPropagation(); handleAgentExportCSV(group.landlord.id); }} style={{ padding: '4px 10px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '14px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  📥 Export
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {!isCollapsed && (
                             <>
