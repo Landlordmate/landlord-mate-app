@@ -3999,7 +3999,7 @@ function App() {
             <button onClick={() => { setAgentGroupByLandlord(!agentGroupByLandlord); setAgentPropertiesPage(1); }} style={{ padding: '6px 12px', background: agentGroupByLandlord ? blue : 'rgba(255,255,255,0.06)', color: agentGroupByLandlord ? 'white' : 'rgba(255,255,255,0.6)', border: `1px solid ${agentGroupByLandlord ? blue : 'rgba(255,255,255,0.1)'}`, borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               👤 Group by Landlord
             </button>
-            <button onClick={handleAgentExportCSV} style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={() => handleAgentExportCSV()} style={{ padding: '6px 14px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               📥 Export CSV
             </button>
             {selectedProperties.length > 0 && (
