@@ -3720,8 +3720,6 @@ function App() {
 
           {agentDemoMode && <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: '#f59e0b', fontWeight: '700', fontSize: '13px' }}>👁 Demo Mode — showing sample portfolio data. Click "Demo ON" to return to your live data.</span></div>}
 
-          <AskAnythingWidget forceWales={true} />
-
           {/* Work Queue — Heart Attack Dashboard */}
           {(workQueue.expired.length > 0 || workQueue.urgent.length > 0) && (
             <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
