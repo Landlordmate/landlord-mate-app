@@ -2468,7 +2468,7 @@ function App() {
     setAiHistory(prev => [...prev, { role: 'user', content: question }]);
 
     try {
-      const isWales = userRecord?.country === 'Wales' || userRecord?.account_type === 'agent';
+      const isWales = isWalesRelevant(properties) || userRecord?.account_type === 'agent';
       const systemPrompt = `You are a helpful UK landlord compliance assistant for The Landlord Mate platform. You provide clear, practical advice on landlord compliance, property law, and lettings regulations.${isWales ? ' The user is based in Wales so prioritise Welsh legislation including the Renting Homes (Wales) Act 2016, Rent Smart Wales requirements, Section 173 notices, and Written Occupation Contracts.' : ' Focus on English and UK-wide landlord law including the Renters Rights Act, Gas Safety regulations, EICR requirements and EPC obligations.'} Keep answers concise, practical and in plain English. Always recommend seeking professional legal advice for specific situations.`;
 
       const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
@@ -2476,7 +2476,7 @@ function App() {
         headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
         body: JSON.stringify({ 
           question,
-          isWales: userRecord?.country === 'Wales' || userRecord?.account_type === 'agent',
+          isWales: isWalesRelevant(properties) || userRecord?.account_type === 'agent',
           history: aiHistory.map(h => ({ role: h.role, content: h.content }))
         })
       });
