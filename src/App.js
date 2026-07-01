@@ -1141,6 +1141,7 @@ function App() {
   const [agentAddPropertySaving, setAgentAddPropertySaving] = useState(false);
   const [agentAddPropertyError, setAgentAddPropertyError] = useState('');
   const [agentProperties, setAgentProperties] = useState([]);
+  const [agentOnboardSizeAnswer, setAgentOnboardSizeAnswer] = useState(null);
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
   const [agentGroupByLandlord, setAgentGroupByLandlord] = useState(false);
@@ -1234,6 +1235,18 @@ function App() {
     const planLabel = required === 'portfolio' ? 'Portfolio' : 'Pro';
     alert(`${featureName} is available on the ${planLabel} plan and above. You can upgrade any time from Settings.`);
   };
+
+  // Decide whether to show the landlord onboarding wizard once we actually
+  // have both the user's DB record and their properties loaded. This runs
+  // as its own effect (rather than inline in loadPropertiesForUser) because
+  // userRecord and properties load in parallel on login, so checking
+  // userRecord inside the properties loader risked reading a stale null.
+  useEffect(() => {
+    if (!userRecord || userRecord.account_type === 'agent') return;
+    if (userRecord.onboarding_complete !== true && properties.length === 0) {
+      setShowOnboarding(true);
+    }
+  }, [userRecord, properties]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -2337,9 +2350,6 @@ function App() {
     if (props) {
       setProperties(props);
       await loadAllDocuments(props);
-      if (props.length === 0 && !localStorage.getItem('tlm_onboarding_done')) {
-        setShowOnboarding(true);
-      }
     }
     const { data: ldocs } = await supabase.from('documents').select('*').eq('user_id', userId).is('property_id', null);
     if (ldocs) setLandlordDocs(ldocs);
@@ -3066,7 +3076,7 @@ function App() {
     }
 
     // Agent onboarding — show for new agents with no properties
-    if (agentProperties.length === 0 && !localStorage.getItem(`tlm_agent_onboarding_${user.id}`)) {
+    if (agentProperties.length === 0 && userRecord?.onboarding_complete !== true) {
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ width: '100%', maxWidth: '560px', textAlign: 'center' }}>
@@ -3086,14 +3096,48 @@ function App() {
                 </div>
               </div>
             ))}
-            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '12px', padding: '16px 20px', margin: '24px 0', textAlign: 'left' }}>
+
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px', textAlign: 'left' }}>
+              <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '15px' }}>One quick thing</p>
+              <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Roughly how many properties does your agency manage? We'll point you to the right plan, no pressure, you're on a free trial either way.</p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'small', label: 'Under 50', tier: 'Agent Starter', price: '£499/yr' },
+                  { id: 'mid', label: '50–200', tier: 'Agent Pro', price: '£999/yr' },
+                  { id: 'large', label: '200+', tier: 'Agent Portfolio', price: '£1,999/yr' },
+                ].map(opt => (
+                  <button key={opt.id} onClick={() => setAgentOnboardSizeAnswer(opt)} style={{
+                    padding: '10px 18px', borderRadius: '10px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer',
+                    background: agentOnboardSizeAnswer?.id === opt.id ? blue : 'rgba(255,255,255,0.06)',
+                    color: agentOnboardSizeAnswer?.id === opt.id ? 'white' : 'rgba(255,255,255,0.7)',
+                    border: `1px solid ${agentOnboardSizeAnswer?.id === opt.id ? blue : 'rgba(255,255,255,0.12)'}`,
+                    transition: 'all 0.15s ease'
+                  }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {agentOnboardSizeAnswer && (
+                <div style={{ marginTop: '14px', padding: '12px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: '600' }}>✓ We'd suggest <strong>{agentOnboardSizeAnswer.tier}</strong> ({agentOnboardSizeAnswer.price}) for that</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>You can always change this later in Settings</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '12px', padding: '16px 20px', margin: '0 0 24px', textAlign: 'left' }}>
               <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '14px' }}>Your invitation link</p>
               <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', wordBreak: 'break-all' }}>{inviteLink}</p>
               <button onClick={() => { navigator.clipboard.writeText(inviteLink); setInviteCopied(true); setTimeout(() => setInviteCopied(false), 3000); }} style={{ padding: '8px 20px', background: inviteCopied ? '#22c55e' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
                 {inviteCopied ? '✓ Copied!' : 'Copy Link'}
               </button>
             </div>
-            <button onClick={() => { localStorage.setItem(`tlm_agent_onboarding_${user.id}`, 'done'); window.location.reload(); }} style={{ width: '100%', padding: '14px', background: blue, color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+            <button onClick={async () => {
+              const updates = { onboarding_complete: true };
+              if (agentOnboardSizeAnswer) updates.agent_portfolio_size_estimate = agentOnboardSizeAnswer.id;
+              await supabase.from('users').update(updates).eq('id', user.id);
+              setUserRecord(prev => ({ ...prev, ...updates }));
+            }} style={{ width: '100%', padding: '14px', background: blue, color: 'white', border: 'none', borderRadius: '10px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               Go to my dashboard →
             </button>
           </div>
@@ -4133,8 +4177,8 @@ function App() {
       <AppShell screen="dashboard" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <OnboardingWizard
           user={user}
-          onComplete={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); }}
-          onAddProperty={() => { localStorage.setItem('tlm_onboarding_done', 'true'); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
+          onComplete={async () => { await supabase.from('users').update({ onboarding_complete: true }).eq('id', user.id); setUserRecord(prev => ({ ...prev, onboarding_complete: true })); setShowOnboarding(false); }}
+          onAddProperty={async () => { await supabase.from('users').update({ onboarding_complete: true }).eq('id', user.id); setUserRecord(prev => ({ ...prev, onboarding_complete: true })); setShowOnboarding(false); setScreen('properties'); setShowAdd(true); }}
         />
       </AppShell>
     );
