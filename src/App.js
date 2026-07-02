@@ -1,7 +1,61 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from './supabase';
 import logo from './Logo Landlord mate.jpeg';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
+
+const TURNSTILE_SITE_KEY = '0x4AAAAAADueBaC2ed2qo-XQ';
+
+const Turnstile = forwardRef(function Turnstile({ siteKey, onVerify, onExpire }, ref) {
+  const containerRef = useRef(null);
+  const widgetIdRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    resetCaptcha: () => {
+      if (window.turnstile && widgetIdRef.current !== null) {
+        window.turnstile.reset(widgetIdRef.current);
+      }
+    }
+  }));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function renderWidget() {
+      if (cancelled || !window.turnstile || !containerRef.current || widgetIdRef.current !== null) return;
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: (token) => onVerify(token),
+        'expired-callback': () => { if (onExpire) onExpire(); },
+        'error-callback': () => { if (onExpire) onExpire(); },
+      });
+    }
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const existingScript = document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', renderWidget);
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+        script.async = true;
+        script.defer = true;
+        script.onload = renderWidget;
+        document.head.appendChild(script);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      if (window.turnstile && widgetIdRef.current !== null) {
+        try { window.turnstile.remove(widgetIdRef.current); } catch (e) {}
+        widgetIdRef.current = null;
+      }
+    };
+  }, [siteKey]);
+
+  return <div ref={containerRef} />;
+});
 
 const font = "'Nunito', sans-serif";
 const navy = '#0f1e30';
@@ -3233,6 +3287,7 @@ function App() {
 
     const navItems = [
       { id: 'dashboard', label: '📊 Dashboard' },
+      { id: 'askmate', label: '💬 Ask Mate' },
       { id: 'properties', label: '🏠 Properties' },
       { id: 'landlords', label: '👤 Landlords' },
       { id: 'templates', label: '📝 Templates' },
@@ -3658,6 +3713,97 @@ function App() {
                 <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{t.body}</p>
               </div>
             ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (agentScreen === 'askmate') {
+      const agentChatPrompts = [
+        'What documents do I need for a Welsh tenancy?',
+        'What is a Section 173 notice?',
+        'What is Rent Smart Wales?',
+        'What is a Written Occupation Contract?',
+        'What is an EICR and when do I need one?',
+        'When must I protect a tenancy deposit?',
+      ];
+      return (
+        <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
+          <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
+              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
+              <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
+              <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {navItems.map(n => <button key={n.id} onClick={async () => { setAgentScreen(n.id); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); if (n.id === 'properties') setSelectedAgentProperty(null); const { data } = await supabase.from('templates').select('*').eq('agent_id', user.id); if (data) setAgentTemplates(data); }} style={{ padding: '6px 12px', background: agentScreen === n.id ? blue : 'transparent', color: agentScreen === n.id ? 'white' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>{n.label}</button>)}
+              <button onClick={handleSignOut} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Sign Out</button>
+            </div>
+          </div>
+
+          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <span onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
+              <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Instant answers on landlord and letting law, with memory of your conversation. Covers Wales and England compliance.</p>
+            </div>
+
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', marginBottom: '16px', minHeight: '300px' }}>
+              {aiHistory.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', marginBottom: '18px' }}>Ask me anything about landlord or letting agent compliance, or try one of these:</p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {agentChatPrompts.map((s, i) => (
+                      <button key={i} onClick={() => { setAiQuestion(s); }} style={{ background: 'rgba(43,124,211,0.15)', border: '1px solid rgba(43,124,211,0.3)', color: '#7db3e8', padding: '8px 14px', borderRadius: '20px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {aiHistory.map((m, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '75%', padding: '10px 16px', borderRadius: '16px', fontSize: '13px', lineHeight: '1.6', fontFamily: font,
+                    background: m.role === 'user' ? blue : 'rgba(255,255,255,0.07)',
+                    color: m.role === 'user' ? 'white' : 'rgba(255,255,255,0.85)',
+                    borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
+                    borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {aiLoading && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{ padding: '10px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font }}>
+                    Thinking...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Ask about Gas Safe, EICR, Rent Smart Wales, tenancy law..."
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAskAI(); }}
+                style={{ width: '100%', padding: '16px 56px 16px 20px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(43,124,211,0.4)', borderRadius: '50px', color: 'white', fontSize: '15px', fontFamily: font, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <button
+                onClick={() => handleAskAI()}
+                disabled={aiLoading || !aiQuestion.trim()}
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '38px', height: '38px', background: blue, color: 'white', border: 'none', borderRadius: '50%', fontSize: '16px', cursor: aiLoading || !aiQuestion.trim() ? 'not-allowed' : 'pointer', opacity: aiLoading || !aiQuestion.trim() ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {aiLoading ? '⋯' : '↑'}
+              </button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '10px', textAlign: 'center' }}>Ask Mate can make mistakes. Always seek professional advice for specific situations.</p>
           </div>
         </div>
       );
@@ -5646,7 +5792,7 @@ function App() {
             <span onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '18px' }}>{showPassword ? '🙈' : '👁️'}</span>
           </div>
           <div style={{ marginBottom: '20px' }}>
-            <HCaptcha sitekey="82d20312-583c-4d42-b1a2-6b52e0c4cbbc" onVerify={(token) => setCaptchaToken(token)} onExpire={() => setCaptchaToken('')} ref={captchaRef} />
+            <Turnstile siteKey={TURNSTILE_SITE_KEY} onVerify={(token) => setCaptchaToken(token)} onExpire={() => setCaptchaToken('')} ref={captchaRef} />
           </div>
           <select value={referralSource} onChange={e => setReferralSource(e.target.value)} style={{ ...lightInputStyle, marginBottom: '16px', color: referralSource ? '#0f1e30' : '#999' }}>
             <option value="">How did you hear about us? (optional)</option>
