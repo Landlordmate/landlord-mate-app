@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from './supabase';
 import logo from './Logo Landlord mate.jpeg';
+import * as Sentry from "@sentry/react";
+
+Sentry.init({
+  dsn: "https://1e789b2e334793578d6fcee57a284887@o4511667260948480.ingest.de.sentry.io/4511667272417360",
+});
 
 const TURNSTILE_SITE_KEY = '0x4AAAAAADueBaC2ed2qo-XQ';
 
