@@ -4640,6 +4640,7 @@ function App() {
       <AppShell screen="askmate" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
         <div style={{ padding: isMobile ? '20px 16px 90px' : '32px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 'calc(100vh - 72px)' : '100vh', boxSizing: 'border-box' }}>
           <div style={{ marginBottom: '20px' }}>
+            <span onClick={() => setScreen('dashboard')} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
             <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Instant answers on landlord law and compliance, with memory of your conversation.</p>
           </div>
