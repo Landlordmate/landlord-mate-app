@@ -1115,6 +1115,7 @@ function App() {
   const [editDocType, setEditDocType] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [loginCaptchaToken, setLoginCaptchaToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [editingAgentEmailInline, setEditingAgentEmailInline] = useState(false);
@@ -1274,6 +1275,7 @@ function App() {
   const [bulkChasing, setBulkChasing] = useState(false);
   const [bulkChaseResult, setBulkChaseResult] = useState('');
   const captchaRef = useRef(null);
+  const loginCaptchaRef = useRef(null);
   const isMobile = useIsMobile();
 
   const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 14 };
@@ -2447,8 +2449,9 @@ function App() {
   const handleSignIn = async () => {
     setLoading(true);
     setError('');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setError(error.message); setLoading(false); return; }
+    if (!loginCaptchaToken) { setError('Please complete the CAPTCHA.'); setLoading(false); return; }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: loginCaptchaToken } });
+    if (error) { setError(error.message); loginCaptchaRef.current?.resetCaptcha(); setLoginCaptchaToken(''); setLoading(false); return; }
     if (data.user) {
       setUser(data.user);
       await loadPropertiesForUser(data.user.id);
@@ -5838,6 +5841,9 @@ function App() {
         <p style={{ textAlign: 'right', margin: '0 0 16px', fontSize: '14px' }}>
           <span onClick={() => { setScreen('forgot'); setError(''); }} style={{ color: '#0f1e30', fontWeight: '600', cursor: 'pointer' }}>Forgot password?</span>
         </p>
+        <div style={{ marginBottom: '20px' }}>
+          <Turnstile siteKey={TURNSTILE_SITE_KEY} onVerify={(token) => setLoginCaptchaToken(token)} onExpire={() => setLoginCaptchaToken('')} ref={loginCaptchaRef} />
+        </div>
         <button onClick={handleSignIn} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
