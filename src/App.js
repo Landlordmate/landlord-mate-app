@@ -705,7 +705,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>{properties.length} {properties.length === 1 ? 'property' : 'properties'}</p>
           </div>
         </div>
-        <button onClick={handleSignOut} style={{ width: '100%', padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>Sign Out</button>
+        <button onClick={handleSignOut} style={{ width: '100%', padding: '10px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', color: '#f87171', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: font }}>Sign Out</button>
       </div>
     </div>
   );
@@ -4795,8 +4795,11 @@ function App() {
         <div style={{ padding: isMobile ? '20px 16px 90px' : '32px', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 'calc(100vh - 72px)' : '100vh', boxSizing: 'border-box' }}>
           <div style={{ marginBottom: '20px' }}>
             <span onClick={() => setScreen('dashboard')} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
-            <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Instant answers on landlord law and compliance, with memory of your conversation.</p>
+            <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+              <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
+              <h1 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h1>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance, with memory of your conversation.</p>
+            </div>
           </div>
 
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', marginBottom: '16px', minHeight: '300px' }}>
