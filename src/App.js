@@ -69,12 +69,12 @@ const blue = '#2b7cd3';
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 const PRICE_IDS = {
-  starter: { annual: 'price_1ThpMm6vahEFgcuGjzecKEm3', monthly: 'price_1TkBxO6vahEFgcuGqWLQobJp' },
-  pro: { annual: 'price_1ThpOV6vahEFgcuG2H1Yfl6V', monthly: 'price_1TkByF6vahEFgcuGOkEWeJXj' },
-  portfolio: { annual: 'price_1ThpQD6vahEFgcuGPyhVCk4z', monthly: 'price_1TkByv6vahEFgcuGZjem7E8V' },
-  agent_starter: { annual: 'price_1TifdQ6vahEFgcuG85QGlksp', monthly: 'price_1TkC0y6vahEFgcuGW7Vr3Wtt' },
-  agent_pro: { annual: 'price_1TifmS6vahEFgcuGR4ctmnZ0', monthly: 'price_1TkC1o6vahEFgcuG0PJeOQB8' },
-  agent_portfolio: { annual: 'price_1Tifnq6vahEFgcuGppTEia34', monthly: 'price_1TkC356vahEFgcuGP9uBN3Ul' },
+  starter: { annual: 'price_1TpZbC5NBmtcziU4LjXThhwZ', monthly: 'price_1TpZbC5NBmtcziU438DdnrvJ' },
+  pro: { annual: 'price_1TpZcK5NBmtcziU4tXlBZm2K', monthly: 'price_1TpZcK5NBmtcziU4HNgnGsxM' },
+  portfolio: { annual: 'price_1TpZcS5NBmtcziU41LfqiSyT', monthly: 'price_1TpZcS5NBmtcziU4b7kMtQJ1' },
+  agent_starter: { annual: 'price_1TpZcY5NBmtcziU4yJyvyefF', monthly: 'price_1TpZcY5NBmtcziU499WC0B73' },
+  agent_pro: { annual: 'price_1TpZcd5NBmtcziU4Me9q0PYO', monthly: 'price_1TpZcc5NBmtcziU4pxw1xjBT' },
+  agent_portfolio: { annual: 'price_1TpZci5NBmtcziU45Y97MTe5', monthly: 'price_1TpZci5NBmtcziU493pLJiSk' },
 };
 
 const LANDLORD_DOC_TYPES = [
