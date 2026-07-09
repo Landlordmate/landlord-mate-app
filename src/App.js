@@ -2605,7 +2605,7 @@ function App() {
         })
       });
       const data = await response.json();
-      const answer = data.answer || 'Sorry, I could not get an answer. Please try again.';
+      const answer = (typeof data.answer === 'string' && data.answer) ? data.answer : 'Sorry, I could not get an answer. Please try again.';
       setAiHistory(prev => [...prev, { role: 'assistant', content: answer }]);
       setAiAnswer(answer);
     } catch(e) {
