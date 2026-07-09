@@ -3751,7 +3751,7 @@ function App() {
             </div>
           </div>
 
-          <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }}>
+          <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }}>div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }}>
             <div style={{ marginBottom: '20px' }}>
               <span onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
               <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
