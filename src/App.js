@@ -3754,8 +3754,11 @@ function App() {
           <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box' }}>
             <div style={{ marginBottom: '20px' }}>
               <span onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
-              <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 6px' }}>💬 Ask Mate</h1>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Instant answers on landlord and letting law, with memory of your conversation. Covers Wales and England compliance.</p>
+              <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+                <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
+                <h1 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h1>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord and letting law, with memory of your conversation. Covers Wales and England compliance.</p>
+              </div>
             </div>
 
             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', marginBottom: '16px', minHeight: '300px' }}>
