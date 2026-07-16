@@ -5042,8 +5042,8 @@ function App() {
                 <div style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select address</label>
                   <select onChange={(e) => setNewAddress(e.target.value)} style={inputStyle} defaultValue="">
-                    <option value="" disabled>Choose address…</option>
-                    {addressResults.map((a, i) => <option key={i} value={a}>{a}</option>)}
+                    <option value="" disabled style={{ color: '#0f1e30', background: 'white' }}>Choose address…</option>
+                    {addressResults.map((a, i) => <option key={i} value={a} style={{ color: '#0f1e30', background: 'white' }}>{a}</option>)}
                   </select>
                 </div>
               )}
