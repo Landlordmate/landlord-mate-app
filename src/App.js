@@ -677,7 +677,9 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         <img src={logo} alt="The Landlord Mate" style={{ height: '72px' }} />
         {landlordLogoUrl && (
           <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(43,124,211,0.15)' }}>
-            <img src={landlordLogoUrl} alt="Your logo" style={{ height: '96px', width: '96px', objectFit: 'contain', display: 'block', background: 'white', borderRadius: '10px', padding: '6px' }} />
+            <div style={{ width: '96px', height: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '8px', boxSizing: 'border-box' }}>
+              <img src={landlordLogoUrl} alt="Your logo" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', display: 'block' }} />
+            </div>
           </div>
         )}
       </div>
@@ -3909,7 +3911,9 @@ function App() {
               
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>Agency Logo</p>
               {(pendingAgencyLogoPreview || agencyLogoUrl) && (
-                <img src={pendingAgencyLogoPreview || agencyLogoUrl} alt="Agency logo" style={{ height: '64px', objectFit: 'contain', marginBottom: '12px', display: 'block', borderRadius: '6px', maxWidth: '200px', background: 'white', padding: '8px 12px' }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '64px', maxWidth: '200px', marginBottom: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px 12px', boxSizing: 'border-box' }}>
+                  <img src={pendingAgencyLogoPreview || agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', display: 'block' }} />
+                </div>
               )}
               <input type="file" accept="image/*" onChange={e => handleAgencyLogoSelect(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '10px', display: 'block' }} />
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
