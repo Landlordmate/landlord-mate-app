@@ -3602,7 +3602,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -3684,7 +3684,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -3744,7 +3744,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -3842,7 +3842,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -3878,7 +3878,7 @@ function App() {
           <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-              {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+              {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
               <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
               <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
@@ -3956,7 +3956,7 @@ function App() {
         <div style={{ background: '#0d1b2a', borderBottom: '1px solid rgba(43,124,211,0.2)', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={logo} alt="The Landlord Mate" style={{ height: '80px', cursor: 'pointer' }} onClick={() => { setAgentScreen('dashboard'); setShowBulkInvite(false); setShowInviteForm(false); setShowAgentAddProperty(false); }} />
-            {agencyLogoUrl && <img src={agencyLogoUrl} alt="Agency logo" style={{ height: '80px', objectFit: 'contain' }} />}
+            {agencyLogoUrl && (<div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '80px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 10px', boxSizing: 'border-box' }}><img src={agencyLogoUrl} alt="Agency logo" style={{ maxHeight: '100%', maxWidth: '160px', objectFit: 'contain', display: 'block' }} /></div>)}
             <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.15)' }} />
             <span style={{ color: 'white', fontWeight: '900', fontSize: '20px', letterSpacing: '-0.5px' }}>{userRecord?.agency_name || 'Agent Portal'}</span>
             <span style={{ background: 'rgba(43,124,211,0.2)', color: blue, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>AGENT</span>
