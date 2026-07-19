@@ -1281,7 +1281,7 @@ function App() {
   const loginCaptchaRef = useRef(null);
   const isMobile = useIsMobile();
 
-  const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 14 };
+  const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 7 };
   const isSubscribed = userRecord?.subscription_status === 'active' || userRecord?.lifetime_access === true;
   const trialExpired = trialStatus.expired && !isSubscribed;
   const showTrialNudge = !trialStatus.expired && trialStatus.daysLeft <= 4 && !isSubscribed;
