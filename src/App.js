@@ -67,6 +67,7 @@ const navy = '#0f1e30';
 const navyLight = '#1a2e45';
 const blue = '#2b7cd3';
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 
 const PRICE_IDS = {
   starter: { annual: 'price_1TpZbC5NBmtcziU4LjXThhwZ', monthly: 'price_1TpZbC5NBmtcziU438DdnrvJ' },
@@ -766,9 +767,9 @@ function AskAnythingWidget({ properties, forceWales }) {
     setLoading(true);
     setAnswer('');
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ask-anything`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ question: query, isWales: showWalesPrompts })
       });
       const data = await res.json();
@@ -1369,7 +1370,7 @@ function App() {
       // Send payment confirmation email
       if (user?.email) {
         const planName = userRecord?.lifetime_access ? 'Lifetime Access' : (userRecord?.account_type === 'agent' ? 'Agent Plan' : `${userRecord?.subscription_tier || 'Starter'} Plan`);
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1421,7 +1422,7 @@ function App() {
     const fullName = authUser?.user_metadata?.full_name || userRow.agency_name || 'there';
     if (userRow.account_type === 'agent') {
       const inviteLink = `https://app.thelandlordmate.com?agent=${userRow.agent_code}`;
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1432,7 +1433,7 @@ function App() {
         })
       }).catch(() => {});
     } else {
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1474,9 +1475,9 @@ function App() {
     const landlordIds = [...new Set(props.map(p => p.user_id).filter(Boolean))];
     if (landlordIds.length > 0) {
       try {
-        const landlordsRes = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/get-agent-landlords', {
+        const landlordsRes = await fetch(`${SUPABASE_URL}/functions/v1/get-agent-landlords`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
           body: JSON.stringify({ ids: landlordIds }),
         });
         const landlordsData = await landlordsRes.json();
@@ -1545,9 +1546,9 @@ function App() {
         reader.readAsDataURL(agentUploadFile);
       });
       const mimeType = agentUploadFile.type || 'application/octet-stream';
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-document-dates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: agentDocType !== 'Other' ? agentDocType : '' }),
       });
       const data = await res.json();
@@ -1596,7 +1597,7 @@ function App() {
 
     const landlord = agentLandlords.find(l => l.id === selectedAgentProperty.user_id);
     if (landlord?.email) {
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1656,9 +1657,9 @@ function App() {
     await supabase.from('templates').delete().eq('agent_id', user.id);
     await supabase.from('users').delete().eq('id', user.id);
     try {
-      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
+      await fetch(`${SUPABASE_URL}/functions/v1/delete-user`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ userId: user.id }),
       });
     } catch (e) {
@@ -1671,9 +1672,9 @@ function App() {
   const handleAgentDeleteProperty = async () => {
     if (!window.confirm(`Remove ${selectedAgentProperty.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-delete-property', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-delete-property`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ propertyId: selectedAgentProperty.id, agentId: user.id }),
       });
       const result = await res.json();
@@ -1693,9 +1694,9 @@ function App() {
     e.stopPropagation();
     if (!window.confirm(`Remove ${property.address_line_1} from your properties? This also deletes any documents attached to it. This can't be undone.`)) return;
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-delete-property', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-delete-property`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ propertyId: property.id, agentId: user.id }),
       });
       const result = await res.json();
@@ -1924,7 +1925,7 @@ function App() {
       }
 
       const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2004,7 +2005,7 @@ function App() {
         }
 
         const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
-        const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2038,7 +2039,7 @@ function App() {
       }).eq('id', invitation.id);
 
       const inviteLink = `https://app.thelandlordmate.com?invite=${invitation.token}`;
-      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      await fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2101,9 +2102,9 @@ function App() {
       let existingLandlord = null;
       let landlordAlreadyHasThisProperty = false;
       try {
-        const lookupRes = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/lookup-landlord', {
+        const lookupRes = await fetch(`${SUPABASE_URL}/functions/v1/lookup-landlord`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
           body: JSON.stringify({ email: emailTrimmed, address: newAddress }),
         });
         const lookupData = await lookupRes.json();
@@ -2150,7 +2151,7 @@ function App() {
 
       if (existingLandlord) {
         setAgentAddPropertyMessage({ type: 'success', text: `\u2713 Linked directly to ${emailTrimmed}'s existing account — it'll be waiting for them next time they log in. No invite needed.` });
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2189,7 +2190,7 @@ function App() {
         }
 
         const inviteLink = `https://app.thelandlordmate.com?invite=${token}`;
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2228,7 +2229,7 @@ function App() {
       const landlord = agentLandlords.find(l => l.id === property?.user_id);
       if (landlord?.email) {
         try {
-          await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+          await fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2357,7 +2358,7 @@ function App() {
   const handleSubscribe = async (priceId) => {
     setSubscribing(true);
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/create-checkout-session', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ priceId, userId: user.id, email: user.email })
@@ -2385,7 +2386,7 @@ function App() {
         setPortalLoading(false);
         return;
       }
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/create-portal-session', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ customerId })
@@ -2434,7 +2435,7 @@ function App() {
     setAddressError('');
     setAddressResults([]);
     try {
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/find-address', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/find-address`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ postcode: newPostcode })
@@ -2597,9 +2598,9 @@ function App() {
       const isWales = isWalesRelevant(properties) || userRecord?.account_type === 'agent';
       const systemPrompt = `You are a helpful UK landlord compliance assistant for The Landlord Mate platform. You provide clear, practical advice on landlord compliance, property law, and lettings regulations.${isWales ? ' The user is based in Wales so prioritise Welsh legislation including the Renting Homes (Wales) Act 2016, Rent Smart Wales requirements, Section 173 notices, and Written Occupation Contracts.' : ' Focus on English and UK-wide landlord law including the Renters Rights Act, Gas Safety regulations, EICR requirements and EPC obligations.'} Keep answers concise, practical and in plain English. Always recommend seeking professional legal advice for specific situations.`;
 
-      const response = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/ask-anything', {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/ask-anything`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ 
           question,
           isWales: isWalesRelevant(properties) || userRecord?.account_type === 'agent',
@@ -2643,7 +2644,7 @@ function App() {
       setProperties(newProps);
       await loadAllDocuments(newProps);
       if (agentEmailTrimmed) {
-        fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+        fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2671,7 +2672,7 @@ function App() {
     if (error) { alert(error.message); return; }
     setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry, agent_email: newAgentEmailTrimmed || null } : p));
     if (isNewAgentEmail) {
-      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2844,9 +2845,9 @@ function App() {
         reader.readAsDataURL(uploadFile);
       });
       const mimeType = uploadFile.type || 'application/octet-stream';
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-document-dates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: docType !== 'Other' ? docType : '' }),
       });
       const data = await res.json();
@@ -2901,9 +2902,9 @@ function App() {
         reader.readAsDataURL(landlordUploadFile);
       });
       const mimeType = landlordUploadFile.type || 'application/octet-stream';
-      const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/extract-document-dates', {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-document-dates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ fileBase64, mimeType, documentTypeHint: landlordDocType }),
       });
       const data = await res.json();
@@ -3642,9 +3643,9 @@ function App() {
                             if (!editingLandlordName.trim()) return;
                             setSavingLandlordName(true);
                             try {
-                              const res = await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/agent-update-landlord-name', {
+                              const res = await fetch(`${SUPABASE_URL}/functions/v1/agent-update-landlord-name`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+                                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
                                 body: JSON.stringify({ agentId: user.id, landlordId: l.id, fullName: editingLandlordName.trim() }),
                               });
                               const result = await res.json();
@@ -4409,7 +4410,7 @@ function App() {
                     setSelectedProperty({ ...selectedProperty, agent_email: trimmed || null });
                     setProperties(properties.map(p => p.id === selectedProperty.id ? { ...p, agent_email: trimmed || null } : p));
                     if (isNew) {
-                      fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/send-welcome-email', {
+                      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -5429,9 +5430,9 @@ function App() {
     await supabase.from('properties').delete().eq('user_id', user.id);
     await supabase.from('users').delete().eq('id', user.id);
     try {
-      await fetch('https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/delete-user', {
+      await fetch(`${SUPABASE_URL}/functions/v1/delete-user`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3ZmhjZG92YnZ2dmR2a2pzZ2lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMTMzNzAsImV4cCI6MjA5NTg4OTM3MH0.pELmW7Shb4YnJ8AWmJipd0SK6tfONXl3IBHJwE0g7kI' },
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ userId: user.id }),
       });
     } catch (e) {
@@ -5578,12 +5579,12 @@ function App() {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                   <input
                     readOnly
-                    value={`https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`}
+                    value={`${SUPABASE_URL}/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`}
                     onClick={(e) => e.target.select()}
                     style={{ flex: 1, padding: '10px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontFamily: 'monospace' }}
                   />
                   <button
-                    onClick={() => { navigator.clipboard.writeText(`https://pwfhcdovbvvvdvkjsgip.supabase.co/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`); setCalendarLinkCopied(true); setTimeout(() => setCalendarLinkCopied(false), 2000); }}
+                    onClick={() => { navigator.clipboard.writeText(`${SUPABASE_URL}/functions/v1/calendar-feed?token=${userRecord?.calendar_token || ''}`); setCalendarLinkCopied(true); setTimeout(() => setCalendarLinkCopied(false), 2000); }}
                     style={{ padding: '10px 16px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >{calendarLinkCopied ? '✓ Copied' : 'Copy link'}</button>
                 </div>
