@@ -11,6 +11,11 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// APP_URL is set per-project (production vs staging) so the billing portal
+// returns customers to the environment they came from. Falls back to
+// production if unset.
+const appUrl = (Deno.env.get('APP_URL') ?? 'https://app.thelandlordmate.com').replace(/\/$/, '')
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -28,7 +33,7 @@ Deno.serve(async (req) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: 'https://app.thelandlordmate.com/',
+      return_url: `${appUrl}/`,
     })
 
     return new Response(JSON.stringify({ url: session.url }), {

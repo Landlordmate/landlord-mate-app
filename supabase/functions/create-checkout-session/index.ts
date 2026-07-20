@@ -11,6 +11,11 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// APP_URL is set per-project (production vs staging) so checkout redirects
+// land back on the environment the customer actually started from, instead
+// of always bouncing to production. Falls back to production if unset.
+const appUrl = (Deno.env.get('APP_URL') ?? 'https://app.thelandlordmate.com').replace(/\/$/, '')
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -38,8 +43,8 @@ Deno.serve(async (req) => {
       },
       metadata: { userId },
       allow_promotion_codes: true,
-      success_url: 'https://app.thelandlordmate.com/?action=subscribed',
-      cancel_url: 'https://app.thelandlordmate.com/',
+      success_url: `${appUrl}/?action=subscribed`,
+      cancel_url: `${appUrl}/`,
     })
 
     return new Response(JSON.stringify({ url: session.url }), {

@@ -85,13 +85,14 @@ const PRICE_IDS_LIVE = {
   agent_portfolio: { annual: 'price_1TpZci5NBmtcziU45Y97MTe5', monthly: 'price_1TpZci5NBmtcziU493pLJiSk' },
 };
 
-// Test-mode equivalents. Only Starter has been recreated in test mode so far
-// (2026-07-20) — the rest still point at live IDs and will fail on staging
-// until their test-mode twins are created in the Stripe test dashboard and
-// added here, same way Starter was done.
+// Test-mode equivalents, created 2026-07-20 to match PRICE_IDS_LIVE 1:1.
 const PRICE_IDS_TEST = {
-  ...PRICE_IDS_LIVE,
   starter: { annual: 'price_1TvCSQ5NBmtcziU4HLmmN41Z', monthly: 'price_1TvCUQ5NBmtcziU4tJyVhDZz' },
+  pro: { annual: 'price_1TvDiZ5NBmtcziU47L4e1vaJ', monthly: 'price_1TvDka5NBmtcziU477YOOX5r' },
+  portfolio: { annual: 'price_1TvDq55NBmtcziU4aI5ec1JE', monthly: 'price_1TvDsB5NBmtcziU4COBiUSTH' },
+  agent_starter: { annual: 'price_1TvDvV5NBmtcziU40rOcLjcH', monthly: 'price_1TvDwW5NBmtcziU4JPMJVedF' },
+  agent_pro: { annual: 'price_1TvDys5NBmtcziU4qktBSPZe', monthly: 'price_1TvE015NBmtcziU4ZR1x99jR' },
+  agent_portfolio: { annual: 'price_1TvE2B5NBmtcziU4eq0h1TFw', monthly: 'price_1TvE3P5NBmtcziU4UGzMG5dM' },
 };
 
 const PRICE_IDS = STRIPE_TEST_MODE ? PRICE_IDS_TEST : PRICE_IDS_LIVE;
