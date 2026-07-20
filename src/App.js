@@ -69,7 +69,14 @@ const blue = '#2b7cd3';
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 
-const PRICE_IDS = {
+// Stripe price IDs are mode-specific (live vs test) and will 404 if the
+// wrong ones are sent to the wrong Stripe secret key. REACT_APP_STRIPE_TEST_MODE
+// is set to 'true' on the staging Netlify site (test-mode Stripe key) and left
+// unset in production (live-mode Stripe key), so each environment gets the
+// price IDs that actually match its Stripe key.
+const STRIPE_TEST_MODE = process.env.REACT_APP_STRIPE_TEST_MODE === 'true';
+
+const PRICE_IDS_LIVE = {
   starter: { annual: 'price_1TpZbC5NBmtcziU4LjXThhwZ', monthly: 'price_1TpZbC5NBmtcziU438DdnrvJ' },
   pro: { annual: 'price_1TpZcK5NBmtcziU4tXlBZm2K', monthly: 'price_1TpZcK5NBmtcziU4HNgnGsxM' },
   portfolio: { annual: 'price_1TpZcS5NBmtcziU41LfqiSyT', monthly: 'price_1TpZcS5NBmtcziU4b7kMtQJ1' },
@@ -77,6 +84,17 @@ const PRICE_IDS = {
   agent_pro: { annual: 'price_1TpZcd5NBmtcziU4Me9q0PYO', monthly: 'price_1TpZcc5NBmtcziU4pxw1xjBT' },
   agent_portfolio: { annual: 'price_1TpZci5NBmtcziU45Y97MTe5', monthly: 'price_1TpZci5NBmtcziU493pLJiSk' },
 };
+
+// Test-mode equivalents. Only Starter has been recreated in test mode so far
+// (2026-07-20) — the rest still point at live IDs and will fail on staging
+// until their test-mode twins are created in the Stripe test dashboard and
+// added here, same way Starter was done.
+const PRICE_IDS_TEST = {
+  ...PRICE_IDS_LIVE,
+  starter: { annual: 'price_1TvCSQ5NBmtcziU4HLmmN41Z', monthly: 'price_1TvCUQ5NBmtcziU4tJyVhDZz' },
+};
+
+const PRICE_IDS = STRIPE_TEST_MODE ? PRICE_IDS_TEST : PRICE_IDS_LIVE;
 
 const LANDLORD_DOC_TYPES = [
   'Passport',
