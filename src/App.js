@@ -611,10 +611,14 @@ function AgentView({ token }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: prop } = await supabase.from('properties').select('*').eq('share_token', token).single();
+      // Fetched via a token-gated RPC rather than a direct table read. The
+      // properties/documents tables are no longer publicly readable, so the
+      // share link only resolves when the exact token is supplied.
+      const { data: props } = await supabase.rpc('get_shared_property', { p_token: token });
+      const prop = Array.isArray(props) ? props[0] : props;
       if (prop) {
         setProperty(prop);
-        const { data: docs } = await supabase.from('documents').select('*').eq('property_id', prop.id);
+        const { data: docs } = await supabase.rpc('get_shared_documents', { p_token: token });
         if (docs) setDocuments(docs);
       }
       setLoading(false);
