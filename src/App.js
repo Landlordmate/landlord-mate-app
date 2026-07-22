@@ -131,6 +131,16 @@ const DOC_TYPES = [
 
 const COUNTRIES = ['England', 'Wales', 'Scotland', 'Northern Ireland'];
 
+// Occupancy status for a property — shared between the Add/Edit forms and
+// anywhere the status badge is displayed, so the label/colour stay in sync.
+const PROPERTY_STATUS_META = {
+  vacant: { label: 'Vacant', color: '#eab308', bg: 'rgba(234,179,8,0.15)' },
+  occupied: { label: 'Occupied', color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
+  under_offer: { label: 'Under Offer', color: '#2b7cd3', bg: 'rgba(43,124,211,0.15)' },
+  notice_given: { label: 'Notice Given', color: '#f97316', bg: 'rgba(249,115,22,0.15)' },
+  void: { label: 'Void', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+};
+
 // Returns true if any property in the given list is in Wales.
 // Properties with no country set yet default to "not Wales" — safer to
 // under-show Welsh-specific content than confuse a non-Welsh landlord.
@@ -1079,6 +1089,10 @@ function App() {
   const [newType, setNewType] = useState('house');
   const [newCountry, setNewCountry] = useState('Wales');
   const [newAgentEmail, setNewAgentEmail] = useState('');
+  const [newStatus, setNewStatus] = useState('');
+  const [newMonthlyRent, setNewMonthlyRent] = useState('');
+  const [newBedrooms, setNewBedrooms] = useState('');
+  const [newBathrooms, setNewBathrooms] = useState('');
   const [addressResults, setAddressResults] = useState([]);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState('');
@@ -1151,6 +1165,10 @@ function App() {
   const [editPropertyType, setEditPropertyType] = useState('house');
   const [editPropertyCountry, setEditPropertyCountry] = useState('Wales');
   const [editPropertyAgentEmail, setEditPropertyAgentEmail] = useState('');
+  const [editPropertyStatus, setEditPropertyStatus] = useState('');
+  const [editPropertyMonthlyRent, setEditPropertyMonthlyRent] = useState('');
+  const [editPropertyBedrooms, setEditPropertyBedrooms] = useState('');
+  const [editPropertyBathrooms, setEditPropertyBathrooms] = useState('');
   const [landlordDocs, setLandlordDocs] = useState([]);
   const [showLandlordUpload, setShowLandlordUpload] = useState(false);
   const [landlordDocType, setLandlordDocType] = useState(LANDLORD_DOC_TYPES[0]);
@@ -1220,6 +1238,10 @@ function App() {
   const [agentEditPropertyAddress, setAgentEditPropertyAddress] = useState('');
   const [agentEditPropertyType, setAgentEditPropertyType] = useState('');
   const [agentEditPropertyCountry, setAgentEditPropertyCountry] = useState('');
+  const [agentEditPropertyStatus, setAgentEditPropertyStatus] = useState('');
+  const [agentEditPropertyMonthlyRent, setAgentEditPropertyMonthlyRent] = useState('');
+  const [agentEditPropertyBedrooms, setAgentEditPropertyBedrooms] = useState('');
+  const [agentEditPropertyBathrooms, setAgentEditPropertyBathrooms] = useState('');
   const [agentAddPropertySaving, setAgentAddPropertySaving] = useState(false);
   const [agentAddPropertyError, setAgentAddPropertyError] = useState('');
   const [agentProperties, setAgentProperties] = useState([]);
@@ -1647,18 +1669,27 @@ function App() {
     setAgentEditPropertyAddress(selectedAgentProperty.address_line_1);
     setAgentEditPropertyType(selectedAgentProperty.property_type);
     setAgentEditPropertyCountry(selectedAgentProperty.country || 'Wales');
+    setAgentEditPropertyStatus(selectedAgentProperty.status || '');
+    setAgentEditPropertyMonthlyRent(selectedAgentProperty.monthly_rent ?? '');
+    setAgentEditPropertyBedrooms(selectedAgentProperty.bedrooms ?? '');
+    setAgentEditPropertyBathrooms(selectedAgentProperty.bathrooms ?? '');
     setAgentEditingProperty(true);
   };
 
   const handleAgentSaveEditProperty = async () => {
     if (!agentEditPropertyAddress.trim()) { alert('Address cannot be empty.'); return; }
-    const { error } = await supabase.from('properties').update({
+    const updates = {
       address_line_1: agentEditPropertyAddress,
       property_type: agentEditPropertyType,
       country: agentEditPropertyCountry,
-    }).eq('id', selectedAgentProperty.id);
+      status: agentEditPropertyStatus || null,
+      monthly_rent: agentEditPropertyMonthlyRent !== '' ? Number(agentEditPropertyMonthlyRent) : null,
+      bedrooms: agentEditPropertyBedrooms !== '' ? Number(agentEditPropertyBedrooms) : null,
+      bathrooms: agentEditPropertyBathrooms !== '' ? Number(agentEditPropertyBathrooms) : null,
+    };
+    const { error } = await supabase.from('properties').update(updates).eq('id', selectedAgentProperty.id);
     if (error) { alert(error.message); return; }
-    const updated = { ...selectedAgentProperty, address_line_1: agentEditPropertyAddress, property_type: agentEditPropertyType, country: agentEditPropertyCountry };
+    const updated = { ...selectedAgentProperty, ...updates };
     setSelectedAgentProperty(updated);
     setAgentProperties(agentProperties.map(p => p.id === selectedAgentProperty.id ? updated : p));
     setAgentEditingProperty(false);
@@ -2656,7 +2687,17 @@ function App() {
       return;
     }
     const agentEmailTrimmed = newAgentEmail.trim().toLowerCase();
-    const { data, error } = await supabase.from('properties').insert([{ user_id: user.id, address_line_1: newAddress, property_type: newType, country: newCountry, agent_email: agentEmailTrimmed || null }]).select();
+    const { data, error } = await supabase.from('properties').insert([{
+      user_id: user.id,
+      address_line_1: newAddress,
+      property_type: newType,
+      country: newCountry,
+      agent_email: agentEmailTrimmed || null,
+      status: newStatus || null,
+      monthly_rent: newMonthlyRent !== '' ? Number(newMonthlyRent) : null,
+      bedrooms: newBedrooms !== '' ? Number(newBedrooms) : null,
+      bathrooms: newBathrooms !== '' ? Number(newBathrooms) : null,
+    }]).select();
     if (error) { alert(error.message); return; }
     if (data) {
       const newProps = [...properties, data[0]];
@@ -2678,18 +2719,40 @@ function App() {
         setPropertyActionMessage('✓ Property added.');
       }
       setTimeout(() => setPropertyActionMessage(null), 6000);
-      setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail('');
+      setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail(''); setNewStatus(''); setNewMonthlyRent(''); setNewBedrooms(''); setNewBathrooms('');
     }
   };
 
-  const handleEditProperty = (p, e) => { e.stopPropagation(); setEditingProperty(p); setEditPropertyAddress(p.address_line_1); setEditPropertyType(p.property_type); setEditPropertyCountry(p.country || 'Wales'); setEditPropertyAgentEmail(p.agent_email || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleEditProperty = (p, e) => {
+    e.stopPropagation();
+    setEditingProperty(p);
+    setEditPropertyAddress(p.address_line_1);
+    setEditPropertyType(p.property_type);
+    setEditPropertyCountry(p.country || 'Wales');
+    setEditPropertyAgentEmail(p.agent_email || '');
+    setEditPropertyStatus(p.status || '');
+    setEditPropertyMonthlyRent(p.monthly_rent ?? '');
+    setEditPropertyBedrooms(p.bedrooms ?? '');
+    setEditPropertyBathrooms(p.bathrooms ?? '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleSaveEditProperty = async () => {
     const newAgentEmailTrimmed = editPropertyAgentEmail.trim().toLowerCase();
     const isNewAgentEmail = newAgentEmailTrimmed && newAgentEmailTrimmed !== (editingProperty.agent_email || '').toLowerCase();
-    const { error } = await supabase.from('properties').update({ address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry, agent_email: newAgentEmailTrimmed || null }).eq('id', editingProperty.id);
+    const updates = {
+      address_line_1: editPropertyAddress,
+      property_type: editPropertyType,
+      country: editPropertyCountry,
+      agent_email: newAgentEmailTrimmed || null,
+      status: editPropertyStatus || null,
+      monthly_rent: editPropertyMonthlyRent !== '' ? Number(editPropertyMonthlyRent) : null,
+      bedrooms: editPropertyBedrooms !== '' ? Number(editPropertyBedrooms) : null,
+      bathrooms: editPropertyBathrooms !== '' ? Number(editPropertyBathrooms) : null,
+    };
+    const { error } = await supabase.from('properties').update(updates).eq('id', editingProperty.id);
     if (error) { alert(error.message); return; }
-    setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, address_line_1: editPropertyAddress, property_type: editPropertyType, country: editPropertyCountry, agent_email: newAgentEmailTrimmed || null } : p));
+    setProperties(properties.map(p => p.id === editingProperty.id ? { ...p, ...updates } : p));
     if (isNewAgentEmail) {
       fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
         method: 'POST',
@@ -3372,15 +3435,24 @@ function App() {
                     <input type="text" value={agentEditPropertyAddress} onChange={(e) => setAgentEditPropertyAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                       <select value={agentEditPropertyType} onChange={(e) => setAgentEditPropertyType(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }}>
-                        <option value="House">House</option>
-                        <option value="Flat">Flat</option>
-                        <option value="Bungalow">Bungalow</option>
-                        <option value="HMO">HMO</option>
-                        <option value="Other">Other</option>
+                        <option value="house">House</option>
+                        <option value="flat">Flat</option>
+                        <option value="hmo">HMO</option>
                       </select>
                       <select value={agentEditPropertyCountry} onChange={(e) => setAgentEditPropertyCountry(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }}>
                         {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
+                    </div>
+                    <select value={agentEditPropertyStatus} onChange={(e) => setAgentEditPropertyStatus(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }}>
+                      <option value="">— Status —</option>
+                      {Object.entries(PROPERTY_STATUS_META).map(([value, meta]) => (
+                        <option key={value} value={value}>{meta.label}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <input type="number" min="0" step="0.01" placeholder="Rent £/mo" value={agentEditPropertyMonthlyRent} onChange={(e) => setAgentEditPropertyMonthlyRent(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+                      <input type="number" min="0" step="1" placeholder="Beds" value={agentEditPropertyBedrooms} onChange={(e) => setAgentEditPropertyBedrooms(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+                      <input type="number" min="0" step="1" placeholder="Baths" value={agentEditPropertyBathrooms} onChange={(e) => setAgentEditPropertyBathrooms(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={handleAgentSaveEditProperty} style={{ flex: 1, padding: '10px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>Save</button>
@@ -3391,6 +3463,22 @@ function App() {
                   <>
                     <h1 style={{ color: 'white', fontWeight: '900', fontSize: '22px', margin: '0 0 4px' }}>{selectedAgentProperty.address_line_1}</h1>
                     <p style={{ color: 'rgba(255,255,255,0.5)', margin: '0 0 8px', fontSize: '13px', textTransform: 'capitalize' }}>{selectedAgentProperty.property_type}{selectedAgentProperty.country ? ` · ${selectedAgentProperty.country}` : ''}</p>
+                    {(selectedAgentProperty.status || selectedAgentProperty.monthly_rent != null || selectedAgentProperty.bedrooms || selectedAgentProperty.bathrooms) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                        {selectedAgentProperty.status && PROPERTY_STATUS_META[selectedAgentProperty.status] && (
+                          <span style={{ background: PROPERTY_STATUS_META[selectedAgentProperty.status].bg, color: PROPERTY_STATUS_META[selectedAgentProperty.status].color, padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>{PROPERTY_STATUS_META[selectedAgentProperty.status].label}</span>
+                        )}
+                        {selectedAgentProperty.monthly_rent != null && selectedAgentProperty.monthly_rent !== '' && (
+                          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '700' }}>£{Number(selectedAgentProperty.monthly_rent).toLocaleString()}<span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>/mo</span></span>
+                        )}
+                        {!!selectedAgentProperty.bedrooms && (
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>🛏 {selectedAgentProperty.bedrooms} bed{selectedAgentProperty.bedrooms === 1 ? '' : 's'}</span>
+                        )}
+                        {!!selectedAgentProperty.bathrooms && (
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>🛁 {selectedAgentProperty.bathrooms} bath{selectedAgentProperty.bathrooms === 1 ? '' : 's'}</span>
+                        )}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={handleAgentEditPropertyOpen} style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>✏️ Edit</button>
                       <button onClick={handleAgentDeleteProperty} style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🗑 Delete</button>
@@ -4259,6 +4347,16 @@ function App() {
                   <div>
                     <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
                     <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+                    {(property.status || property.monthly_rent != null) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                        {property.status && PROPERTY_STATUS_META[property.status] && (
+                          <span style={{ background: PROPERTY_STATUS_META[property.status].bg, color: PROPERTY_STATUS_META[property.status].color, padding: '1px 7px', borderRadius: '8px', fontSize: '9px', fontWeight: '700' }}>{PROPERTY_STATUS_META[property.status].label}</span>
+                        )}
+                        {property.monthly_rent != null && property.monthly_rent !== '' && (
+                          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontWeight: '600' }}>£{Number(property.monthly_rent).toLocaleString()}/mo</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{landlord?.full_name || landlord?.email || '—'}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4414,6 +4512,23 @@ function App() {
           <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '4px', textTransform: 'capitalize', fontSize: '13px' }}>
             {selectedProperty.property_type}{selectedProperty.country ? ` · ${getCountryFlag(selectedProperty.country)} ${selectedProperty.country}` : ''}
           </p>
+
+          {(selectedProperty.status || selectedProperty.monthly_rent != null || selectedProperty.bedrooms || selectedProperty.bathrooms) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {selectedProperty.status && PROPERTY_STATUS_META[selectedProperty.status] && (
+                <span style={{ background: PROPERTY_STATUS_META[selectedProperty.status].bg, color: PROPERTY_STATUS_META[selectedProperty.status].color, padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>{PROPERTY_STATUS_META[selectedProperty.status].label}</span>
+              )}
+              {selectedProperty.monthly_rent != null && selectedProperty.monthly_rent !== '' && (
+                <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '700' }}>£{Number(selectedProperty.monthly_rent).toLocaleString()}<span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>/mo</span></span>
+              )}
+              {!!selectedProperty.bedrooms && (
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>🛏 {selectedProperty.bedrooms} bed{selectedProperty.bedrooms === 1 ? '' : 's'}</span>
+              )}
+              {!!selectedProperty.bathrooms && (
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>🛁 {selectedProperty.bathrooms} bath{selectedProperty.bathrooms === 1 ? '' : 's'}</span>
+              )}
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>👤 Letting Agent:</span>
@@ -4952,6 +5067,8 @@ function App() {
               })}
             </div>
           )}
+
+          {propertyActionMessage && (
             <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
               <p style={{ margin: 0, color: '#4ade80', fontSize: '13px', fontWeight: '600', lineHeight: '1.5' }}>{propertyActionMessage}</p>
               <button onClick={() => setPropertyActionMessage(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>✕</button>
@@ -4977,11 +5094,32 @@ function App() {
                 <option value="flat">Flat</option>
                 <option value="hmo">HMO</option>
               </select>
-<label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Country</label>
               <select value={editPropertyCountry} onChange={(e) => setEditPropertyCountry(e.target.value)} style={inputStyle}>
                 {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional — links this property to your agent's account if they're already on The Landlord Mate, or invites them if not)</span></label>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Status</label>
+              <select value={editPropertyStatus} onChange={(e) => setEditPropertyStatus(e.target.value)} style={inputStyle}>
+                <option value="">— Select status —</option>
+                {Object.entries(PROPERTY_STATUS_META).map(([value, meta]) => (
+                  <option key={value} value={value}>{meta.label}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Monthly Rent (£)</label>
+                  <input type="number" min="0" step="0.01" placeholder="e.g. 950" value={editPropertyMonthlyRent} onChange={(e) => setEditPropertyMonthlyRent(e.target.value)} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Bedrooms</label>
+                  <input type="number" min="0" step="1" placeholder="e.g. 3" value={editPropertyBedrooms} onChange={(e) => setEditPropertyBedrooms(e.target.value)} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Bathrooms</label>
+                  <input type="number" min="0" step="1" placeholder="e.g. 1" value={editPropertyBathrooms} onChange={(e) => setEditPropertyBathrooms(e.target.value)} style={inputStyle} />
+                </div>
+              </div>
+              <label style={{ display: 'block', marginBottom: '6px', marginTop: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional — links this property to your agent's account if they're already on The Landlord Mate, or invites them if not)</span></label>
               <input type="email" placeholder="e.g. agent@shepherdsharpe.co.uk" value={editPropertyAgentEmail} onChange={(e) => setEditPropertyAgentEmail(e.target.value)} style={inputStyle} />
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={handleSaveEditProperty} style={{ ...primaryBtn, flex: 1 }}>Save Changes</button>
@@ -5036,6 +5174,21 @@ function App() {
                     <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: '12px', textTransform: 'capitalize' }}>
                       {p.property_type}{p.country ? ` · ${getCountryFlag(p.country)} ${p.country}` : ''} · <span style={{ color: blue }}>View →</span>
                     </p>
+                    {(p.status || p.monthly_rent || p.bedrooms || p.bathrooms) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+                        {p.status && PROPERTY_STATUS_META[p.status] && (
+                          <span style={{ background: PROPERTY_STATUS_META[p.status].bg, color: PROPERTY_STATUS_META[p.status].color, padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '700', whiteSpace: 'nowrap' }}>{PROPERTY_STATUS_META[p.status].label}</span>
+                        )}
+                        {(p.bedrooms || p.bathrooms) && (
+                          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                            {p.bedrooms ? `🛏 ${p.bedrooms}` : ''}{p.bedrooms && p.bathrooms ? '  ·  ' : ''}{p.bathrooms ? `🛁 ${p.bathrooms}` : ''}
+                          </span>
+                        )}
+                        {p.monthly_rent != null && p.monthly_rent !== '' && (
+                          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>£{Number(p.monthly_rent).toLocaleString()}/mo</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
@@ -5082,11 +5235,32 @@ function App() {
                 <option value="flat">Flat</option>
                 <option value="hmo">HMO</option>
               </select>
-              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional)</span></label>
+              <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Status</label>
+              <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} style={inputStyle}>
+                <option value="">— Select status —</option>
+                {Object.entries(PROPERTY_STATUS_META).map(([value, meta]) => (
+                  <option key={value} value={value}>{meta.label}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Monthly Rent (£)</label>
+                  <input type="number" min="0" step="0.01" placeholder="e.g. 950" value={newMonthlyRent} onChange={(e) => setNewMonthlyRent(e.target.value)} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Bedrooms</label>
+                  <input type="number" min="0" step="1" placeholder="e.g. 3" value={newBedrooms} onChange={(e) => setNewBedrooms(e.target.value)} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Bathrooms</label>
+                  <input type="number" min="0" step="1" placeholder="e.g. 1" value={newBathrooms} onChange={(e) => setNewBathrooms(e.target.value)} style={inputStyle} />
+                </div>
+              </div>
+              <label style={{ display: 'block', marginBottom: '6px', marginTop: '12px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Letting agent email <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '400' }}>(optional)</span></label>
               <input type="email" placeholder="e.g. agent@shepherdsharpe.co.uk" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} style={inputStyle} />
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={handleSaveProperty} style={{ ...primaryBtn, flex: 1 }}>Save Property</button>
-                <button onClick={() => { setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail(''); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => { setShowAdd(false); setNewAddress(''); setNewPostcode(''); setAddressResults([]); setNewCountry('Wales'); setNewAgentEmail(''); setNewStatus(''); setNewMonthlyRent(''); setNewBedrooms(''); setNewBathrooms(''); }} style={{ flex: 1, padding: '14px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
           )}
