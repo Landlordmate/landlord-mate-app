@@ -117,6 +117,31 @@ Note: the staging SQL editor blocks `drop policy` statements behind a
 success but nothing changed, that dialog was almost certainly swallowed — always
 re-query to confirm rather than trusting the success message.
 
+## Incident: agent dashboards went blank (same day, fixed)
+
+Dropping the `share_token IS NOT NULL` policy on `properties` closed the data leak,
+but it **also silently removed agent read access**. That policy was true for every
+row, so it had been acting as a blanket "anyone can read everything" rule — and the
+agent dashboard was unknowingly relying on it. Removing it left agents with no SELECT
+path at all, and every agent's property list emptied.
+
+Fixed by adding properly scoped replacements:
+
+```sql
+create policy "Agents can view their landlords properties" on public.properties
+for select to authenticated
+using (
+  added_by_agent_id = (select auth.uid())
+  or lower(agent_email) = (select lower(email) from public.users where id = (select auth.uid()))
+);
+-- plus the equivalent "Agents can view their landlords documents" on public.documents
+```
+
+**Lesson worth keeping:** an over-permissive policy is often load-bearing. Before
+removing one, check *who is currently relying on it*, not just what it exposes.
+Testing as anon and as a landlord was not enough — the breakage was only visible from
+an agent account.
+
 ## Still to do
 
 - **`logos` bucket is still public.** Low risk (company logos, non-sensitive) and public
