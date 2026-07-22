@@ -102,10 +102,23 @@ UPDATE storage.buckets SET public = true WHERE id = 'documents';
 That restores the old behaviour immediately. The frontend keeps working either way,
 since signed URLs are valid on public buckets — so rollback is safe and non-breaking.
 
+## Staging (`arioyurzlzxwyuxtvcsp`) — now mirrored ✅
+
+Staging previously had **no storage buckets at all**, so document upload/view was never
+testable there. That's now fixed, and staging mirrors production:
+
+- `documents` bucket created, **private**
+- `logos` bucket created, public
+- 8 storage policies (4 owner CRUD + agent read + 3 logos), matching production
+- `get-shared-document-urls` edge function deployed
+
+Note: the staging SQL editor blocks `drop policy` statements behind a
+"Potential issue detected" confirmation dialog. If a migration appears to report
+success but nothing changed, that dialog was almost certainly swallowed — always
+re-query to confirm rather than trusting the success message.
+
 ## Still to do
 
-- **Replicate steps 1 and 2 to staging** (`arioyurzlzxwyuxtvcsp`). Staging has no real
-  documents, so nothing is broken there today, but the environments are out of sync.
 - **`logos` bucket is still public.** Low risk (company logos, non-sensitive) and public
   URLs are genuinely useful there for emails and reports. Left deliberately.
 - **Leaked password protection cannot be enabled on the Free plan** — Supabase returns:
