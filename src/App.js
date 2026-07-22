@@ -604,9 +604,44 @@ function TrialNudgeBanner({ daysLeft, onSubscribe }) {
   );
 }
 
+// Opens a compliance document. The documents bucket is private, so there is no
+// permanent public URL — we mint a short-lived signed URL at click time.
+// `resolveUrl` differs by context: signed-in users sign their own URL (allowed by
+// storage RLS), while the anonymous share view goes through an edge function that
+// validates the share token server-side.
+function ViewDocButton({ doc, resolveUrl, style }) {
+  const [busy, setBusy] = useState(false);
+  const handleOpen = async () => {
+    setBusy(true);
+    let url = null;
+    try {
+      url = await resolveUrl(doc);
+    } catch (e) {
+      url = null;
+    }
+    setBusy(false);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    else alert('Sorry, this document could not be opened. Please refresh and try again.');
+  };
+  return (
+    <button onClick={handleOpen} disabled={busy} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, ...style }}>
+      {busy ? '…' : '👁 View'}
+    </button>
+  );
+}
+
+// Signs a URL for a document the current signed-in user is allowed to read.
+const signDocumentUrl = async (doc) => {
+  if (!doc?.file_path) return null;
+  const { data, error } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 300);
+  if (error) { console.error('Signed URL error:', error); return null; }
+  return data?.signedUrl || null;
+};
+
 function AgentView({ token }) {
   const [property, setProperty] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [sharedDocUrls, setSharedDocUrls] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -620,6 +655,16 @@ function AgentView({ token }) {
         setProperty(prop);
         const { data: docs } = await supabase.rpc('get_shared_documents', { p_token: token });
         if (docs) setDocuments(docs);
+        // The bucket is private and an anonymous visitor can't sign its own URLs,
+        // so the edge function validates the token and returns short-lived links.
+        try {
+          const { data: urlData } = await supabase.functions.invoke('get-shared-document-urls', {
+            body: { share_token: token },
+          });
+          if (urlData?.urls) setSharedDocUrls(urlData.urls);
+        } catch (e) {
+          console.error('Could not load document links:', e);
+        }
       }
       setLoading(false);
     };
@@ -655,7 +700,7 @@ function AgentView({ token }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+                {doc.file_path && <ViewDocButton doc={doc} resolveUrl={(d) => sharedDocUrls[d.id] || null} />}
               </div>
             </div>
           );
@@ -3596,7 +3641,7 @@ function App() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                        {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+                        {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
                       </div>
                     </div>
                   );
@@ -4857,7 +4902,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                    {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+                    {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
                     <button onClick={() => handleEditDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
@@ -5320,7 +5365,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
-                    {doc.file_path && (() => { const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path); return <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: '#4a9eff', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>👁 View</a>; })()}
+                    {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
                     <button onClick={() => handleEditLandlordDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
