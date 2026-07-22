@@ -1,50 +1,43 @@
-# Documents Bucket — Lock Down to Private + Signed URLs
+# Documents Bucket — Private + Signed URLs
 
-*Spec written 22 July 2026. Not yet implemented. Requires an active Supabase connection.*
+**Status: IMPLEMENTED on production, 22 July 2026.** Kept as a record of what changed
+and why, and as the checklist for replicating to staging.
 
-## The problem
+## The problem (now fixed)
 
-The `documents` storage bucket is **public**. Compliance documents (tenancy
-agreements, gas certs, EICRs, tenant ID) are served at permanent, unauthenticated
-URLs. Anyone who has or guesses a URL can fetch a tenant's document forever, with
-no login. File paths are not listable (that policy was removed), which limits
-discovery — but it does not fix the underlying exposure.
+The `documents` bucket was **public**. Compliance documents (tenancy agreements, gas
+certs, EICRs, tenant ID) were served at permanent, unauthenticated URLs — anyone with
+or guessing a URL could fetch a tenant's document forever, with no login.
 
-## Why this is not a one-line change
+## Why it wasn't a one-line change
 
-The current storage RLS policy on `storage.objects` only grants read to the file's
-**owner**:
+The storage RLS policy only granted read to the file's **owner**:
 
 ```
 (bucket_id = 'documents' AND (auth.uid())::text = (storage.foldername(name))[1])
 ```
 
-Documents are stored at `{landlord_user_id}/{property_id}/{timestamp}.{ext}`, so
-`foldername[1]` is the landlord's ID. That means:
+Documents live at `{landlord_user_id}/{property_id_or_'landlord'}/{timestamp}.{ext}`,
+so `foldername[1]` is the landlord's ID. That meant:
 
-- **Agents cannot read their landlords' documents under RLS at all.** Today they
-  can only view them because the public bucket URL bypasses RLS entirely.
-- **The public share view** (`AgentView`, anon user) likewise has no RLS route to
-  the files.
+- **Agents had no RLS route to their landlords' documents.** They could only view them
+  because the public bucket bypassed RLS entirely.
+- **The anonymous share view** likewise had no RLS route.
 
-So flipping the bucket to private *without* the work below instantly breaks
-document viewing for agents and for every share link.
+So flipping the bucket private on its own would have instantly broken document access
+for agents and every share link. Hence the ordering below.
 
-## Required order of operations
+## What was done, in order
 
-Do these in sequence. Do not flip the bucket until steps 1–3 are deployed and verified.
-
-### 1. Add a storage policy so agents can read their landlords' documents
+### 1. Storage policy so agents can read linked landlords' documents ✅
 
 ```sql
-CREATE POLICY "Agents can read documents for their landlords' properties"
-ON storage.objects FOR SELECT
-TO authenticated
+CREATE POLICY "Agents can read documents for linked landlords"
+ON storage.objects FOR SELECT TO authenticated
 USING (
   bucket_id = 'documents'
   AND EXISTS (
-    SELECT 1
-    FROM public.properties p
+    SELECT 1 FROM public.properties p
     JOIN public.users a ON a.id = (select auth.uid())
     WHERE (storage.foldername(name))[1] = p.user_id::text
       AND a.account_type = 'agent'
@@ -54,83 +47,68 @@ USING (
 );
 ```
 
-Mirrors the existing agent→property link logic in `loadAgentData`
-(`agent_email.eq.<email>` OR `added_by_agent_id.eq.<id>`). Verify against that
-function if the linking rules change.
+Mirrors the agent→property link logic in `loadAgentData`. If those linking rules
+change, this policy must change with them.
 
-### 2. Create an edge function to serve share-link documents
+### 2. Edge function `get-shared-document-urls` ✅
 
-The anon share view cannot sign its own URLs. Needs a `get-shared-document-urls`
-edge function that:
+The anon share view can't sign its own URLs. This function takes `{ share_token }`,
+looks up the property with the service role, and returns 300-second signed URLs for
+that property's documents only. Unknown/invalid tokens both return 404 with no
+explanation, to avoid confirming whether a token exists.
 
-- accepts `{ share_token }`
-- looks up the property by `share_token` using the **service role** key
-- returns short-lived signed URLs (suggest 300s) for that property's documents only
-- returns 404 for an unknown/invalid token — never echo back why
+### 3. Frontend switched to signed URLs ✅
 
-Guard against enumeration: rate-limit, and do not leak whether a token exists.
+All four `getPublicUrl` call sites replaced with a shared `<ViewDocButton>` component
+that resolves a URL on click (async), since signed URLs can't be generated
+synchronously during render:
 
-### 3. Switch the frontend to signed URLs
+| Context | How it resolves |
+|---------|-----------------|
+| `AgentView` (public share) | edge function, pre-fetched into `sharedDocUrls` |
+| Agent property view | `signDocumentUrl` → `createSignedUrl` (needs policy from step 1) |
+| Landlord property view | `signDocumentUrl` (owner, already permitted) |
+| Landlord property list | `signDocumentUrl` (owner, already permitted) |
 
-Four call sites currently use `getPublicUrl` for documents in `src/App.js`
-(line numbers as of commit `095651b`):
+Signed URLs work on public buckets too, which is why step 3 was deployed and verified
+*before* step 4 — that ordering is deliberate, keep it if you ever redo this.
 
-| Line | Context | Replacement |
-|------|---------|-------------|
-| ~658  | `AgentView` (public share view) | call the edge function from step 2 |
-| ~3599 | Agent property view | `createSignedUrl` (works once step 1 lands) |
-| ~4860 | Landlord property view | `createSignedUrl` (owner, already permitted) |
-| ~5323 | Landlord property list | `createSignedUrl` (owner, already permitted) |
-
-All four are currently a **synchronous** IIFE returning `<a href={publicUrl}>`.
-`createSignedUrl` is async, so this needs restructuring — recommend one shared
-component:
-
-```jsx
-function ViewDocButton({ doc, getUrl }) {
-  const [busy, setBusy] = useState(false);
-  const open = async () => {
-    setBusy(true);
-    const url = await getUrl(doc);       // signed URL or edge-function URL
-    setBusy(false);
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-    else alert('Could not open this document. Please try again.');
-  };
-  return <button onClick={open} disabled={busy}>{busy ? '…' : '👁 View'}</button>;
-}
-```
-
-Note: signed URLs work fine on a bucket that is still public, so step 3 can be
-deployed and verified **before** step 4. That is the whole point of this ordering.
-
-### 4. Flip the bucket to private
-
-Only after steps 1–3 are live and verified in production:
+### 4. Bucket flipped private ✅
 
 ```sql
 UPDATE storage.buckets SET public = false WHERE id = 'documents';
 ```
 
-### 5. Verify
+## Verified on production
 
-- Landlord opens own document → works
-- Agent opens a linked landlord's document → works
-- Agent attempts a *non*-linked landlord's document → denied
-- Share link opens documents → works
-- Old public URL, logged out → now denied (this is the actual fix)
-- Signed URL after expiry → denied
+- Share link loads property + documents ✅
+- Clicking View mints a fresh signed URL and the PDF opens ✅ (retested after the flip)
+- Old public URL now returns `400 / "Bucket not found"` ✅ — this is the actual fix
+- All 10 documents have valid paths, none orphaned by the change ✅
 
-## Related, not covered here
+**Not yet verified** (needs a real login, can't be done from a script):
+- Landlord opening their own document while signed in
+- Agent opening a linked landlord's document
+- Agent being denied a *non*-linked landlord's document
 
-- The `logos` bucket is also public. Much lower risk (company logos, non-sensitive)
-  and logos are embedded in emails//reports where public URLs are genuinely useful.
-  Leave public unless there's a reason not to.
-- Existing documents keep their current paths; no migration of stored files needed.
+## Rollback
 
-## Blocked on
+If document viewing breaks for signed-in users:
 
-Leaked password protection (`HaveIBeenPwned` check) **cannot be enabled on the Free
-plan** — confirmed 22 July 2026, Supabase returns:
-*"Configuring leaked password protection via HaveIBeenPwned.org is available on Pro
-Plans and up."* Requires the Supabase Pro upgrade, which was already on the launch
-plan to trigger after first real payment clears.
+```sql
+UPDATE storage.buckets SET public = true WHERE id = 'documents';
+```
+
+That restores the old behaviour immediately. The frontend keeps working either way,
+since signed URLs are valid on public buckets — so rollback is safe and non-breaking.
+
+## Still to do
+
+- **Replicate steps 1 and 2 to staging** (`arioyurzlzxwyuxtvcsp`). Staging has no real
+  documents, so nothing is broken there today, but the environments are out of sync.
+- **`logos` bucket is still public.** Low risk (company logos, non-sensitive) and public
+  URLs are genuinely useful there for emails and reports. Left deliberately.
+- **Leaked password protection cannot be enabled on the Free plan** — Supabase returns:
+  *"Configuring leaked password protection via HaveIBeenPwned.org is available on Pro
+  Plans and up."* Needs the Supabase Pro upgrade, already on the launch plan for after
+  the first real payment clears.
