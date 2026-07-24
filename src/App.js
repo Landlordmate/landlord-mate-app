@@ -3595,7 +3595,7 @@ function App() {
                       </>
                     )}
                     <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-                    <div
+                    <label
                       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onDrop={(e) => {
                         e.preventDefault();
@@ -3603,11 +3603,13 @@ function App() {
                         const droppedFile = e.dataTransfer.files && e.dataTransfer.files[0];
                         if (droppedFile) { setAgentUploadFile(droppedFile); setAgentScanResult(null); setAgentScanError(''); }
                       }}
-                      style={{ border: '1px dashed rgba(43,124,211,0.4)', borderRadius: '8px', padding: '10px' }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(43,124,211,0.45)', borderRadius: '12px', padding: '32px 20px', cursor: 'pointer', textAlign: 'center', background: 'rgba(43,124,211,0.05)' }}
                     >
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" onChange={(e) => { setAgentUploadFile(e.target.files[0]); setAgentScanResult(null); setAgentScanError(''); }} style={{ ...inputStyle, padding: '8px', margin: 0 }} />
-                      <p style={{ margin: '6px 0 0', fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>or drag and drop a file here</p>
-                    </div>
+                      <span style={{ fontSize: '26px', marginBottom: '8px' }}>⬆️</span>
+                      <span style={{ color: 'white', fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{agentUploadFile ? agentUploadFile.name : 'Drop your document here'}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{agentUploadFile ? 'Click to choose a different file' : 'or click to browse'}</span>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" onChange={(e) => { setAgentUploadFile(e.target.files[0]); setAgentScanResult(null); setAgentScanError(''); }} style={{ display: 'none' }} />
+                    </label>
 
                     {agentUploadFile && !agentScanResult && (
                       <button onClick={handleScanAgentDocument} disabled={scanningAgentDocument} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningAgentDocument ? 'default' : 'pointer', opacity: scanningAgentDocument ? 0.7 : 1 }}>
@@ -4945,7 +4947,7 @@ function App() {
                 </>
               )}
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <div
+              <label
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -4953,11 +4955,13 @@ function App() {
                   const droppedFile = e.dataTransfer.files && e.dataTransfer.files[0];
                   if (droppedFile) { setUploadFile(droppedFile); setScanResult(null); setScanError(''); }
                 }}
-                style={{ border: '1px dashed rgba(43,124,211,0.4)', borderRadius: '8px', padding: '10px' }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(43,124,211,0.45)', borderRadius: '12px', padding: '32px 20px', cursor: 'pointer', textAlign: 'center', background: 'rgba(43,124,211,0.05)' }}
               >
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setUploadFile(e.target.files[0]); setScanResult(null); setScanError(''); }} style={{ ...inputStyle, padding: '8px', margin: 0 }} />
-                <p style={{ margin: '6px 0 0', fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>or drag and drop a file here</p>
-              </div>
+                <span style={{ fontSize: '26px', marginBottom: '8px' }}>⬆️</span>
+                <span style={{ color: 'white', fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{uploadFile ? uploadFile.name : 'Drop your document here'}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{uploadFile ? 'Click to choose a different file' : 'or click to browse'}</span>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setUploadFile(e.target.files[0]); setScanResult(null); setScanError(''); }} style={{ display: 'none' }} />
+              </label>
 
               {uploadFile && !scanResult && (
                 <button onClick={handleScanDocument} disabled={scanningDocument} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningDocument ? 'default' : 'pointer', opacity: scanningDocument ? 0.7 : 1 }}>
@@ -5423,7 +5427,7 @@ function App() {
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Expiry date <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(optional)</span></label>
               <input type="date" value={landlordExpiryDate} onChange={(e) => setLandlordExpiryDate(e.target.value)} style={inputStyle} />
               <label style={{ display: 'block', marginBottom: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Select file <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '400' }}>(PDF, JPG or PNG)</span></label>
-              <div
+              <label
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -5431,11 +5435,13 @@ function App() {
                   const droppedFile = e.dataTransfer.files && e.dataTransfer.files[0];
                   if (droppedFile) { setLandlordUploadFile(droppedFile); setLandlordScanResult(null); setLandlordScanError(''); }
                 }}
-                style={{ border: '1px dashed rgba(43,124,211,0.4)', borderRadius: '8px', padding: '10px' }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(43,124,211,0.45)', borderRadius: '12px', padding: '32px 20px', cursor: 'pointer', textAlign: 'center', background: 'rgba(43,124,211,0.05)' }}
               >
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setLandlordUploadFile(e.target.files[0]); setLandlordScanResult(null); setLandlordScanError(''); }} style={{ ...inputStyle, padding: '8px', margin: 0 }} />
-                <p style={{ margin: '6px 0 0', fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>or drag and drop a file here</p>
-              </div>
+                <span style={{ fontSize: '26px', marginBottom: '8px' }}>⬆️</span>
+                <span style={{ color: 'white', fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{landlordUploadFile ? landlordUploadFile.name : 'Drop your document here'}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{landlordUploadFile ? 'Click to choose a different file' : 'or click to browse'}</span>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" capture={false} onChange={(e) => { setLandlordUploadFile(e.target.files[0]); setLandlordScanResult(null); setLandlordScanError(''); }} style={{ display: 'none' }} />
+              </label>
 
               {landlordUploadFile && !landlordScanResult && (
                 <button onClick={handleScanLandlordDocument} disabled={scanningLandlordDoc} style={{ width: '100%', padding: '12px', marginTop: '4px', marginBottom: '12px', background: 'rgba(43,124,211,0.12)', border: '1px solid rgba(43,124,211,0.35)', borderRadius: '8px', color: blue, fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: scanningLandlordDoc ? 'default' : 'pointer', opacity: scanningLandlordDoc ? 0.7 : 1 }}>
