@@ -3619,8 +3619,12 @@ function App() {
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={handleAgentEditPropertyOpen} style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>✏️ Edit</button>
-                      <button onClick={handleAgentDeleteProperty} style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🗑 Delete</button>
+                      {!selectedAgentProperty.deleted_at && (
+                        <>
+                          <button onClick={handleAgentEditPropertyOpen} style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>✏️ Edit</button>
+                          <button onClick={handleAgentDeleteProperty} style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>🗑 Delete</button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -3817,6 +3821,13 @@ function App() {
               <div>
                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginBottom: '16px' }}>Timeline of activity for this property.</p>
                 <div style={{ position: 'relative', paddingLeft: '20px', borderLeft: '2px solid rgba(43,124,211,0.3)' }}>
+                  {agentPropertyAuditHistory.filter(e => e.action === 'soft_deleted').map(entry => (
+                    <div key={entry.id} style={{ marginBottom: '16px', position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: '-25px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                      <p style={{ margin: '0 0 2px', color: 'white', fontSize: '13px', fontWeight: '600' }}>🔒 Removed by {entry.actor_role || 'landlord'}</p>
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{new Date(entry.created_at).toLocaleString('en-GB')}</p>
+                    </div>
+                  ))}
                   {selectedAgentPropertyDocs.map(doc => (
                     <div key={doc.id} style={{ marginBottom: '16px', position: 'relative' }}>
                       <div style={{ position: 'absolute', left: '-25px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: blue }} />
@@ -3837,7 +3848,7 @@ function App() {
                     <p style={{ margin: '0 0 2px', color: 'white', fontSize: '13px', fontWeight: '600' }}>👁️ Agent viewed property</p>
                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Just now</p>
                   </div>
-                  {selectedAgentPropertyDocs.length === 0 && agentNotes.length === 0 && (
+                  {selectedAgentPropertyDocs.length === 0 && agentNotes.length === 0 && agentPropertyAuditHistory.filter(e => e.action === 'soft_deleted').length === 0 && (
                     <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No activity recorded yet</p>
                   )}
                 </div>
