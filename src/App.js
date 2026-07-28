@@ -1167,6 +1167,8 @@ function App() {
   const [editLandlordExpiry, setEditLandlordExpiry] = useState('');
   const [propertyNotes, setPropertyNotes] = useState('');
   const [notesSaved, setNotesSaved] = useState(false);
+  const [noteAttachmentFile, setNoteAttachmentFile] = useState(null);
+  const [uploadingNoteAttachment, setUploadingNoteAttachment] = useState(false);
   const [todos, setTodos] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [newInventoryRoom, setNewInventoryRoom] = useState('');
@@ -1542,6 +1544,10 @@ function App() {
     // Load all properties linked to this agent — either a landlord self-linked
     // them by entering this agent's email, or this agent added the property
     // directly on the landlord's behalf.
+    // Agents deliberately still see soft-deleted properties for 30 days after
+    // a landlord removes one — this is their compliance evidence if a legal
+    // question comes up about a property they used to manage. The landlord's
+    // own view (loadUserData, elsewhere) filters these out; the agent's does not.
     const { data: props } = await supabase
       .from('properties')
       .select('*')
@@ -1665,6 +1671,7 @@ function App() {
   };
 
   const handleAgentUpload = async () => {
+    if (selectedAgentProperty?.deleted_at) { alert('This property was removed by the landlord and is now view-only.'); return; }
     if (!agentUploadFile) { alert('Please select a file.'); return; }
     setAgentUploading(true);
     const fileExt = agentUploadFile.name.split('.').pop();
@@ -1726,6 +1733,7 @@ function App() {
   };
 
   const handleAgentSaveEditProperty = async () => {
+    if (selectedAgentProperty?.deleted_at) { alert('This property was removed by the landlord and is now view-only.'); return; }
     if (!agentEditPropertyAddress.trim()) { alert('Address cannot be empty.'); return; }
     const updates = {
       address_line_1: agentEditPropertyAddress,
@@ -2509,7 +2517,7 @@ function App() {
   };
 
   const loadPropertiesForUser = async (userId) => {
-    const { data: props } = await supabase.from('properties').select('*').eq('user_id', userId);
+    const { data: props } = await supabase.from('properties').select('*').eq('user_id', userId).is('deleted_at', null);
     if (props) {
       setProperties(props);
       await loadAllDocuments(props);
@@ -2823,8 +2831,26 @@ function App() {
 
   const handleDeleteProperty = async (propertyId, e) => {
     if (e) e.stopPropagation();
-    await supabase.from('documents').delete().eq('property_id', propertyId);
-    await supabase.from('properties').delete().eq('id', propertyId);
+
+    // Snapshot the property and its documents before anything changes, so the
+    // audit trail survives even after the 30-day purge cron runs later.
+    const propertyToDelete = properties.find(p => p.id === propertyId);
+    const { data: docsAtDeletion } = await supabase.from('documents').select('*').eq('property_id', propertyId);
+
+    await supabase.from('audit_log').insert([{
+      entity_type: 'property',
+      entity_id: propertyId,
+      action: 'soft_deleted',
+      actor_id: user.id,
+      actor_role: userRecord?.account_type === 'agent' ? 'agent' : 'landlord',
+      snapshot: { property: propertyToDelete || null, documents: docsAtDeletion || [] },
+    }]);
+
+    // Soft delete only. Documents are untouched, they cascade off the property
+    // row, which still exists. A daily cron permanently purges anything with
+    // deleted_at older than 30 days.
+    await supabase.from('properties').update({ deleted_at: new Date().toISOString() }).eq('id', propertyId);
+
     const newProps = properties.filter(p => p.id !== propertyId);
     setProperties(newProps);
     await loadAllDocuments(newProps);
@@ -2858,6 +2884,30 @@ function App() {
       setNotesSaved(true);
       setTimeout(() => setNotesSaved(false), 3000);
     }
+  };
+
+  // Photo of a letter, notice, or other correspondence received about the property.
+  // Deliberately reuses the same documents table and storage bucket as compliance
+  // certificates, tagged with its own document_type, no expiry date required, so
+  // it shows up in the same shared view the agent already sees. No new table needed.
+  const handleUploadNoteAttachment = async () => {
+    if (!noteAttachmentFile) { alert('Please choose a photo first.'); return; }
+    setUploadingNoteAttachment(true);
+    const fileExt = noteAttachmentFile.name.split('.').pop();
+    const filePath = `${user.id}/${selectedProperty.id}/${Date.now()}.${fileExt}`;
+    const { error: storageError } = await supabase.storage.from('documents').upload(filePath, noteAttachmentFile);
+    if (storageError) { alert(storageError.message); setUploadingNoteAttachment(false); return; }
+    const { error: dbError } = await supabase.from('documents').insert([{
+      property_id: selectedProperty.id,
+      user_id: user.id,
+      document_type: 'Letter / Correspondence',
+      file_path: filePath,
+    }]);
+    if (dbError) { alert(dbError.message); setUploadingNoteAttachment(false); return; }
+    const { data: updatedDocs } = await supabase.from('documents').select('*').eq('property_id', selectedProperty.id);
+    if (updatedDocs) { setDocuments(updatedDocs); await loadAllDocuments(properties); }
+    setNoteAttachmentFile(null);
+    setUploadingNoteAttachment(false);
   };
 
   const handleAddTodo = async () => {
@@ -3455,6 +3505,12 @@ function App() {
           </div>
 
           <div style={{ padding: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+            {selectedAgentProperty.deleted_at && (
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px' }}>
+                <p style={{ margin: 0, color: '#ef4444', fontWeight: '700', fontSize: '13px' }}>🔒 Removed by landlord on {new Date(selectedAgentProperty.deleted_at).toLocaleDateString('en-GB')}</p>
+                <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: '12px', lineHeight: '1.5' }}>This is view-only. Records stay visible to you for 30 days for compliance and legal purposes, then are permanently removed. You can't edit or add documents to it.</p>
+              </div>
+            )}
             {/* Property header */}
             {/* Property photo */}
             {selectedAgentProperty.photo_url ? (
@@ -4410,6 +4466,11 @@ function App() {
                   <div>
                     <p style={{ margin: 0, color: 'white', fontWeight: '600', fontSize: '13px' }}>{property.address_line_1}</p>
                     <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.35)', fontSize: '11px', textTransform: 'capitalize' }}>{property.property_type}{property.country ? ` · ${property.country}` : ''}</p>
+                    {property.deleted_at && (
+                      <span style={{ display: 'inline-block', marginTop: '3px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '1px 7px', borderRadius: '8px', fontSize: '9px', fontWeight: '700' }} title={`Removed by the landlord on ${new Date(property.deleted_at).toLocaleDateString('en-GB')}. Records remain visible to you for legal/compliance purposes for 30 days.`}>
+                        REMOVED BY LANDLORD
+                      </span>
+                    )}
                     {(property.status || property.monthly_rent != null) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
                         {property.status && PROPERTY_STATUS_META[property.status] && (
@@ -4681,6 +4742,31 @@ function App() {
             >
               {notesSaved ? '✓ Saved!' : 'Save Notes'}
             </button>
+
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ margin: '0 0 8px', fontWeight: '700', color: 'white', fontSize: '13px' }}>📷 Letters & correspondence</p>
+              <p style={{ margin: '0 0 10px', color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Got sent a letter about this property, a council notice, a solicitor's letter, anything like that? Snap a photo and keep it here.</p>
+              {documents.filter(d => d.property_id === selectedProperty.id && d.document_type === 'Letter / Correspondence').length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                  {documents.filter(d => d.property_id === selectedProperty.id && d.document_type === 'Letter / Correspondence').map(doc => (
+                    <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '13px' }}>📄</span>
+                      <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Added {new Date(doc.uploaded_at).toLocaleDateString('en-GB')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="file" accept="image/*,application/pdf" onChange={e => setNoteAttachmentFile(e.target.files[0])} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }} />
+                <button
+                  onClick={handleUploadNoteAttachment}
+                  disabled={!noteAttachmentFile || uploadingNoteAttachment}
+                  style={{ padding: '6px 16px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: noteAttachmentFile ? 'pointer' : 'not-allowed', opacity: noteAttachmentFile ? 1 : 0.5 }}
+                >
+                  {uploadingNoteAttachment ? 'Uploading…' : 'Attach photo'}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* TO-DO LIST */}
