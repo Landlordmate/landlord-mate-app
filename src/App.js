@@ -1347,6 +1347,7 @@ function App() {
   const [agentBilling, setAgentBilling] = useState('annual');
   const [selectedAgentProperty, setSelectedAgentProperty] = useState(null);
   const [selectedAgentPropertyDocs, setSelectedAgentPropertyDocs] = useState([]);
+  const [agentPropertyAuditHistory, setAgentPropertyAuditHistory] = useState([]);
   const [agentPropertyTab, setAgentPropertyTab] = useState('documents');
   const [agentNotes, setAgentNotes] = useState([]);
   const [newAgentNote, setNewAgentNote] = useState('');
@@ -1620,6 +1621,12 @@ function App() {
     if (notes) setAgentNotes(notes);
     const { data: templates } = await supabase.from('templates').select('*').eq('agent_id', user.id);
     if (templates) setAgentTemplates(templates);
+    if (property.deleted_at) {
+      const { data: history } = await supabase.from('audit_log').select('*').eq('entity_type', 'property').eq('entity_id', property.id).order('created_at', { ascending: false });
+      setAgentPropertyAuditHistory(history || []);
+    } else {
+      setAgentPropertyAuditHistory([]);
+    }
     setAgentScreen('property');
   };
 
@@ -3509,6 +3516,33 @@ function App() {
               <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px' }}>
                 <p style={{ margin: 0, color: '#ef4444', fontWeight: '700', fontSize: '13px' }}>🔒 Removed by landlord on {new Date(selectedAgentProperty.deleted_at).toLocaleDateString('en-GB')}</p>
                 <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: '12px', lineHeight: '1.5' }}>This is view-only. Records stay visible to you for 30 days for compliance and legal purposes, then are permanently removed. You can't edit or add documents to it.</p>
+
+                {agentPropertyAuditHistory.length > 0 && (() => {
+                  const entry = agentPropertyAuditHistory[0];
+                  const snap = entry.snapshot || {};
+                  const snapProperty = snap.property || {};
+                  const snapDocs = snap.documents || [];
+                  return (
+                    <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(239,68,68,0.2)' }}>
+                      <p style={{ margin: '0 0 8px', color: 'white', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📸 What this property looked like when it was removed</p>
+                      <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Address: {snapProperty.address_line_1 || '—'}</p>
+                      <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Status at removal: {snapProperty.status || '—'}{snapProperty.monthly_rent ? ` · £${Number(snapProperty.monthly_rent).toLocaleString()}/mo` : ''}</p>
+                      <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Removed by: {entry.actor_role || 'unknown'} on {new Date(entry.created_at).toLocaleDateString('en-GB')} at {new Date(entry.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
+                      {snapDocs.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <p style={{ margin: '4px 0 4px', color: 'white', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase' }}>Documents on file at that time</p>
+                          {snapDocs.map((doc, i) => (
+                            <p key={i} style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: '12px' }}>
+                              📄 {doc.document_type}{doc.expiry_date ? ` — expired/expires ${new Date(doc.expiry_date).toLocaleDateString('en-GB')}` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontStyle: 'italic' }}>No documents were on file for this property when it was removed.</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
             {/* Property header */}
@@ -4499,8 +4533,12 @@ function App() {
                     {status ? <span style={{ background: status.bg, color: status.color, padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{status.label}</span> : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>—</span>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
-                    <button onClick={(e) => handleQuickEditProperty(property, e)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>✏️</button>
-                    <button onClick={(e) => handleQuickDeleteProperty(property, e)} title="Delete" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>🗑</button>
+                    {!property.deleted_at && (
+                      <>
+                        <button onClick={(e) => handleQuickEditProperty(property, e)} title="Edit" style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>✏️</button>
+                        <button onClick={(e) => handleQuickDeleteProperty(property, e)} title="Delete" style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '13px', cursor: 'pointer', padding: '2px' }}>🗑</button>
+                      </>
+                    )}
                     <p onClick={() => handleSelectAgentProperty(property)} style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View →</p>
                   </div>
                 </div>
