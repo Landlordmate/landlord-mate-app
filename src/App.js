@@ -452,7 +452,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       name: 'Starter',
       annualPrice: 149,
       monthlyPrice: 14.90,
-      properties: '1-3 properties',
+      properties: '1-5 properties',
       desc: 'Perfect for small landlords',
       color: blue,
       features: ['AI document scanning', 'Automatic expiry reminders', 'Secure document storage'],
@@ -462,7 +462,7 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
       name: 'Pro',
       annualPrice: 299,
       monthlyPrice: 29.90,
-      properties: '4-10 properties',
+      properties: '6-20 properties',
       desc: 'Most popular',
       color: '#7c3aed',
       highlight: true,
@@ -1381,7 +1381,8 @@ function App() {
 
   // ---- Tier gating helpers ----
   // Plan property limits, mirrors pricing copy on the landing page and paywall screens.
-  const LANDLORD_PROPERTY_LIMITS = { starter: 3, pro: 10, portfolio: Infinity };
+  // Widened 30 July 2026 (Starter 3->5, Pro 10->20) to stay competitive on property count, not just price.
+  const LANDLORD_PROPERTY_LIMITS = { starter: 5, pro: 20, portfolio: Infinity };
   const AGENT_PROPERTY_LIMITS = { starter: 50, pro: 200, portfolio: Infinity };
   const TIER_RANK = { starter: 0, pro: 1, portfolio: 2 };
   const myTier = userRecord?.lifetime_access ? 'portfolio' : (userRecord?.subscription_tier || 'starter').toLowerCase();
