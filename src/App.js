@@ -320,8 +320,8 @@ function OnboardingWizard({ onComplete, onAddProperty, user }) {
   const toggleDoc = (key) => setDocNeeds(docNeeds.includes(key) ? docNeeds.filter(d => d !== key) : [...docNeeds, key]);
 
   const recommendedPlan = (count) => {
-    if (count === '1' || count === '2-3') return 'Starter (£149/year)';
-    if (count === '4-5' || count === '6-10') return 'Pro (£299/year)';
+    if (count === '1' || count === '2-3' || count === '4-5') return 'Starter (£149/year)';
+    if (count === '6-10' || count === '11-20') return 'Pro (£299/year)';
     return 'Portfolio (£499/year)';
   };
 
