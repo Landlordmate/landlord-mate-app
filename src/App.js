@@ -1383,7 +1383,13 @@ function App() {
   // Plan property limits, mirrors pricing copy on the landing page and paywall screens.
   // Widened 30 July 2026 (Starter 3->5, Pro 10->20) to stay competitive on property count, not just price.
   const LANDLORD_PROPERTY_LIMITS = { starter: 5, pro: 20, portfolio: Infinity };
-  const AGENT_PROPERTY_LIMITS = { starter: 50, pro: 200, portfolio: Infinity };
+  // Agent pricing tiers removed 31 July 2026 — agents don't pay, so property
+  // limits are no longer tier-based. Instead: only UNCLAIMED properties
+  // (added by the agent, landlord hasn't signed up/claimed yet) count
+  // against a flat cap. Claimed properties are unlimited. This enforces the
+  // real deal (free account in exchange for actively inviting your book)
+  // rather than letting an agent hoard a private portfolio for free.
+  const AGENT_UNCLAIMED_PROPERTY_LIMIT = 50;
   const TIER_RANK = { starter: 0, pro: 1, portfolio: 2 };
   const myTier = userRecord?.lifetime_access ? 'portfolio' : (userRecord?.subscription_tier || 'starter').toLowerCase();
   // True if the current user's plan is at or above `required` ('pro' or 'portfolio').
@@ -2200,9 +2206,12 @@ function App() {
       return;
     }
 
-    const agentPropLimit = AGENT_PROPERTY_LIMITS[myTier] ?? AGENT_PROPERTY_LIMITS.starter;
-    if (agentProperties.length >= agentPropLimit) {
-      setAgentAddPropertyError(`Your ${myTier.charAt(0).toUpperCase() + myTier.slice(1)} plan allows up to ${agentPropLimit} properties. Upgrade your plan in Settings to add more.`);
+    // Only properties still waiting on the landlord to sign up count toward
+    // the cap — once a landlord claims a property (user_id gets set,
+    // pending_landlord_email clears) it no longer counts here.
+    const unclaimedCount = agentProperties.filter(p => !!p.pending_landlord_email).length;
+    if (unclaimedCount >= AGENT_UNCLAIMED_PROPERTY_LIMIT) {
+      setAgentAddPropertyError(`You've got ${AGENT_UNCLAIMED_PROPERTY_LIMIT} properties waiting on landlords to sign up. Send those invites out and you can keep adding — claimed properties don't count against this.`);
       return;
     }
 
@@ -3227,7 +3236,12 @@ function App() {
     const inviteLink = `https://app.thelandlordmate.com?agent=${userRecord?.agent_code}`;
     const agentTrialStatus = getTrialStatus(userRecord?.trial_ends_at);
     const agentIsSubscribed = userRecord?.subscription_status === 'active' || userRecord?.lifetime_access === true;
-    const agentTrialExpired = agentTrialStatus.expired && !agentIsSubscribed;
+    // Agent paywall removed 2 August 2026 — under the current model agents
+    // never pay, they're a free distribution channel for landlord signups,
+    // not a revenue line. Any friction here costs landlord signups, not
+    // agent revenue. Left agentTrialStatus/agentIsSubscribed in place since
+    // other code below still reads them; just force the gate itself off.
+    const agentTrialExpired = false;
 
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 3);
     const in28 = new Date(); in28.setDate(in28.getDate() + 28);
