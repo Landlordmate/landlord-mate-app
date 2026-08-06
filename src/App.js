@@ -76,8 +76,12 @@ const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 // price IDs that actually match its Stripe key.
 const STRIPE_TEST_MODE = process.env.REACT_APP_STRIPE_TEST_MODE === 'true';
 
+// Starter dropped from £149/yr + £14.90/mo to £99/yr + £9/mo on 2026-08-06 (see Pricing
+// Update Handoff). New Price objects created on the existing "Landlord Starter" product
+// (prod_UhDoRtLgeuczp9); the old £149/£14.90 live prices are archived — not deleted, so
+// existing subscribers on them are unaffected.
 const PRICE_IDS_LIVE = {
-  starter: { annual: 'price_1TpZbC5NBmtcziU4LjXThhwZ', monthly: 'price_1TpZbC5NBmtcziU438DdnrvJ' },
+  starter: { annual: 'price_1U1PiT5NBmtcziU4v4h6fTIC', monthly: 'price_1U1PiU5NBmtcziU4uUk9lU66' },
   pro: { annual: 'price_1TpZcK5NBmtcziU4tXlBZm2K', monthly: 'price_1TpZcK5NBmtcziU4HNgnGsxM' },
   portfolio: { annual: 'price_1TpZcS5NBmtcziU41LfqiSyT', monthly: 'price_1TpZcS5NBmtcziU4b7kMtQJ1' },
   agent_starter: { annual: 'price_1TpZcY5NBmtcziU4yJyvyefF', monthly: 'price_1TpZcY5NBmtcziU499WC0B73' },
@@ -86,14 +90,25 @@ const PRICE_IDS_LIVE = {
 };
 
 // Test-mode equivalents, created 2026-07-20 to match PRICE_IDS_LIVE 1:1.
+// TODO(pricing-2026-08-06): starter entries are still PLACEHOLDERS — the Stripe connector
+// used to create the new live-mode £99/£9 prices doesn't have test-mode access, so these
+// two need to be created by hand in the Stripe test-mode dashboard on the same "Landlord
+// Starter" product, then swapped in here.
 const PRICE_IDS_TEST = {
-  starter: { annual: 'price_1TvCSQ5NBmtcziU4HLmmN41Z', monthly: 'price_1TvCUQ5NBmtcziU4tJyVhDZz' },
+  starter: { annual: 'price_TODO_STARTER_ANNUAL_99_TEST', monthly: 'price_TODO_STARTER_MONTHLY_9_TEST' },
   pro: { annual: 'price_1TvDiZ5NBmtcziU47L4e1vaJ', monthly: 'price_1TvDka5NBmtcziU477YOOX5r' },
   portfolio: { annual: 'price_1TvDq55NBmtcziU4aI5ec1JE', monthly: 'price_1TvDsB5NBmtcziU4COBiUSTH' },
   agent_starter: { annual: 'price_1TvDvV5NBmtcziU40rOcLjcH', monthly: 'price_1TvDwW5NBmtcziU4JPMJVedF' },
   agent_pro: { annual: 'price_1TvDys5NBmtcziU4qktBSPZe', monthly: 'price_1TvE015NBmtcziU4ZR1x99jR' },
   agent_portfolio: { annual: 'price_1TvE2B5NBmtcziU4eq0h1TFw', monthly: 'price_1TvE3P5NBmtcziU4UGzMG5dM' },
 };
+
+// Old live Starter prices (price_1TpZbC5NBmtcziU4LjXThhwZ / price_1TpZbC5NBmtcziU438DdnrvJ)
+// were archived on Stripe 2026-08-06 and are no longer offered at checkout, but existing
+// subscribers still hold subscriptions on them — see the PRICE_ID_TO_TIER map in
+// supabase/functions/stripe-webhook/index.ts, which still needs them. The old test-mode
+// prices (price_1TvCSQ5NBmtcziU4HLmmN41Z / price_1TvCUQ5NBmtcziU4tJyVhDZz) are untouched for
+// now since test mode couldn't be reached to archive them.
 
 const PRICE_IDS = STRIPE_TEST_MODE ? PRICE_IDS_TEST : PRICE_IDS_LIVE;
 
@@ -320,7 +335,8 @@ function OnboardingWizard({ onComplete, onAddProperty, user }) {
   const toggleDoc = (key) => setDocNeeds(docNeeds.includes(key) ? docNeeds.filter(d => d !== key) : [...docNeeds, key]);
 
   const recommendedPlan = (count) => {
-    if (count === '1' || count === '2-3' || count === '4-5') return 'Starter (£149/year)';
+    if (count === '1') return 'our Free plan, or Starter (£99/year) if you need more than 1 property later';
+    if (count === '2-3' || count === '4-5') return 'Starter (£99/year)';
     if (count === '6-10' || count === '11-20') return 'Pro (£299/year)';
     return 'Portfolio (£499/year)';
   };
@@ -442,16 +458,29 @@ function HomeScreenBanner({ onDismiss }) {
   );
 }
 
-function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
+function PaywallScreen({ user, onSubscribe, onChooseFree, subscribing, onClose, daysLeft }) {
   const isMobile = useIsMobile();
   const [billing, setBilling] = useState('annual');
 
   const plans = [
+    // Free tier, added 2026-08-06: 1 property, same core features as Starter, no card,
+    // no trial countdown — free forever. Never touches Stripe (see onChooseFree).
+    {
+      key: 'free',
+      name: 'Free',
+      annualPrice: 0,
+      monthlyPrice: 0,
+      properties: '1 property',
+      desc: 'Try it out, no card needed',
+      color: '#64748b',
+      features: ['AI document scanning', 'Automatic expiry reminders', 'Secure document storage'],
+    },
     {
       key: 'starter',
       name: 'Starter',
-      annualPrice: 149,
-      monthlyPrice: 14.90,
+      // Dropped from £149/yr + £14.90/mo on 2026-08-06 — see pricing update handoff.
+      annualPrice: 99,
+      monthlyPrice: 9,
       properties: '1-5 properties',
       desc: 'Perfect for small landlords',
       color: blue,
@@ -547,9 +576,10 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: isMobile ? 'column' : 'row' }}>
           {plans.map(plan => {
-            const displayPrice = billing === 'annual' ? `£${plan.annualPrice}` : `£${plan.monthlyPrice.toFixed(2)}`;
-            const period = billing === 'annual' ? '/year' : '/month';
-            const annualEquiv = billing === 'monthly' ? `£${plan.annualPrice}/yr if paid annually` : null;
+            const isFree = plan.key === 'free';
+            const displayPrice = isFree ? 'Free' : (billing === 'annual' ? `£${plan.annualPrice}` : `£${plan.monthlyPrice.toFixed(2)}`);
+            const period = isFree ? '' : (billing === 'annual' ? '/year' : '/month');
+            const annualEquiv = !isFree && billing === 'monthly' ? `£${plan.annualPrice}/yr if paid annually` : null;
 
             return (
               <div key={plan.key} style={{ flex: 1, background: plan.highlight ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.04)', border: `2px solid ${plan.highlight ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`, borderRadius: '16px', padding: '24px', position: 'relative' }}>
@@ -571,11 +601,11 @@ function PaywallScreen({ user, onSubscribe, subscribing, onClose, daysLeft }) {
                   </div>
                 )}
                 <button
-                  onClick={() => onSubscribe(getPriceId(plan))}
+                  onClick={() => isFree ? onChooseFree() : onSubscribe(getPriceId(plan))}
                   disabled={subscribing}
                   style={{ width: '100%', padding: '12px', background: plan.color, color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontFamily: font, fontWeight: '700', cursor: subscribing ? 'not-allowed' : 'pointer', opacity: subscribing ? 0.7 : 1 }}
                 >
-                  {subscribing ? 'Loading...' : `Choose ${plan.name}`}
+                  {subscribing ? 'Loading...' : isFree ? 'Choose Free' : `Choose ${plan.name}`}
                 </button>
               </div>
             );
@@ -1263,6 +1293,7 @@ function App() {
   const [aiHistory, setAiHistory] = useState([]);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [accountType, setAccountType] = useState('landlord');
+  const [startFree, setStartFree] = useState(false);
   const [agencyName, setAgencyName] = useState('');
   const [agencyNameEdit, setAgencyNameEdit] = useState('');
   const [agencyNameSaved, setAgencyNameSaved] = useState(false);
@@ -1375,14 +1406,19 @@ function App() {
   const isMobile = useIsMobile();
 
   const trialStatus = userRecord ? getTrialStatus(userRecord.trial_ends_at) : { expired: false, daysLeft: 7 };
-  const isSubscribed = userRecord?.subscription_status === 'active' || userRecord?.lifetime_access === true;
+  // Free tier (added 2026-08-06) never goes through Stripe and never has a trial to expire —
+  // it's "free forever," not a time-limited trial — so it counts as subscribed here, which
+  // is what keeps free-tier users out of the trial-expired hard paywall below.
+  const isFreeTier = userRecord?.subscription_tier === 'free';
+  const isSubscribed = userRecord?.subscription_status === 'active' || isFreeTier || userRecord?.lifetime_access === true;
   const trialExpired = trialStatus.expired && !isSubscribed;
   const showTrialNudge = !trialStatus.expired && trialStatus.daysLeft <= 4 && !isSubscribed;
 
   // ---- Tier gating helpers ----
   // Plan property limits, mirrors pricing copy on the landing page and paywall screens.
   // Widened 30 July 2026 (Starter 3->5, Pro 10->20) to stay competitive on property count, not just price.
-  const LANDLORD_PROPERTY_LIMITS = { starter: 5, pro: 20, portfolio: Infinity };
+  // free added 2026-08-06: 1 property, same core feature set as Starter (see TIER_RANK below).
+  const LANDLORD_PROPERTY_LIMITS = { free: 1, starter: 5, pro: 20, portfolio: Infinity };
   // Agent pricing tiers removed 31 July 2026 — agents don't pay, so property
   // limits are no longer tier-based. Instead: only UNCLAIMED properties
   // (added by the agent, landlord hasn't signed up/claimed yet) count
@@ -1390,7 +1426,9 @@ function App() {
   // real deal (free account in exchange for actively inviting your book)
   // rather than letting an agent hoard a private portfolio for free.
   const AGENT_UNCLAIMED_PROPERTY_LIMIT = 50;
-  const TIER_RANK = { starter: 0, pro: 1, portfolio: 2 };
+  // free ranks alongside starter: same gating for Pro/Portfolio-only features, the only
+  // difference is the property cap (handled by LANDLORD_PROPERTY_LIMITS above).
+  const TIER_RANK = { free: 0, starter: 0, pro: 1, portfolio: 2 };
   const myTier = userRecord?.lifetime_access ? 'portfolio' : (userRecord?.subscription_tier || 'starter').toLowerCase();
   // True if the current user's plan is at or above `required` ('pro' or 'portfolio').
   const meetsTier = (required) => (TIER_RANK[myTier] ?? 0) >= (TIER_RANK[required] ?? 0);
@@ -2500,6 +2538,29 @@ function App() {
     }
   };
 
+  // Free tier never touches Stripe — just tags the user's row directly. Guarded against
+  // people who already have more than 1 property (can't downgrade under them without
+  // orphaning properties from the plan's limit).
+  const handleChooseFree = async () => {
+    if (properties.length > 1) {
+      alert('The Free plan covers 1 property. Remove properties down to 1 first, or pick a paid plan to keep them all.');
+      return;
+    }
+    setSubscribing(true);
+    try {
+      const { error } = await supabase.from('users').update({ subscription_tier: 'free', subscription_status: 'free' }).eq('id', user.id);
+      if (error) {
+        alert('Something went wrong. Please try again.');
+      } else {
+        setUserRecord(prev => ({ ...prev, subscription_tier: 'free', subscription_status: 'free' }));
+        setForcePaywall(false);
+      }
+    } catch (e) {
+      alert('Something went wrong. Please try again.');
+    }
+    setSubscribing(false);
+  };
+
   const handleManageSubscription = async () => {
     setPortalError('');
     setPortalLoading(true);
@@ -2609,6 +2670,7 @@ function App() {
           referral_source: referralSource || null,
           invite_token: new URLSearchParams(window.location.search).get('invite') || null,
           legacy_agent_code: new URLSearchParams(window.location.search).get('agent') || null,
+          start_free: accountType === 'landlord' ? startFree : false,
         }
       }
     });
@@ -2663,6 +2725,11 @@ function App() {
       resolvedAgentCode = meta.legacy_agent_code;
     }
 
+    // Free tier (2026-08-06): landlord chose "Free forever" at signup instead of the default
+    // 7-day trial. Tag the row directly rather than relying on the trial_ends_at/starter DB
+    // defaults — isSubscribed treats subscription_tier === 'free' as never-expiring.
+    const isFreeSignup = metaAccountType === 'landlord' && meta.start_free === true;
+
     const { error: insertError } = await supabase.from('users').insert([{
       id: authUser.id,
       email: userEmail,
@@ -2672,6 +2739,7 @@ function App() {
       agent_code: metaAccountType === 'agent' ? authUser.id.split('-')[0] : null,
       referred_by_agent: resolvedAgentCode || null,
       referral_source: meta.referral_source || null,
+      ...(isFreeSignup ? { subscription_tier: 'free', subscription_status: 'free' } : {}),
     }]);
     if (insertError) {
       // Most likely a concurrent call (getSession + onAuthStateChange firing
@@ -3223,12 +3291,12 @@ function App() {
   // which is more reliable than this client-side trigger (proper database dedup vs localStorage,
   // and fires even if the person never logs back in to trigger this screen).
   if (user && trialExpired) {
-    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} />;
+    return <PaywallScreen user={user} onSubscribe={handleSubscribe} onChooseFree={handleChooseFree} subscribing={subscribing} />;
   }
 
   // Voluntary "Choose a plan" from Settings — still on trial, can dismiss
   if (user && forcePaywall && !trialExpired) {
-    return <PaywallScreen user={user} onSubscribe={handleSubscribe} subscribing={subscribing} onClose={() => setForcePaywall(false)} daysLeft={trialStatus.daysLeft} />;
+    return <PaywallScreen user={user} onSubscribe={handleSubscribe} onChooseFree={handleChooseFree} subscribing={subscribing} onClose={() => setForcePaywall(false)} daysLeft={trialStatus.daysLeft} />;
   }
 
   // AGENT DASHBOARD
@@ -5936,17 +6004,22 @@ function App() {
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', padding: '20px', borderRadius: '12px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>{userRecord?.lifetime_access ? 'Lifetime Access' : isSubscribed ? 'Active Subscription' : `Free Trial — ${trialStatus.daysLeft} days left`}</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>{userRecord?.lifetime_access ? 'You have permanent access to every feature, no billing involved.' : isSubscribed ? 'Your subscription is active.' : 'Upgrade to keep access after your trial ends.'}</p>
+                <p style={{ color: 'white', fontWeight: '700', margin: '0 0 4px', fontSize: '14px' }}>{userRecord?.lifetime_access ? 'Lifetime Access' : isFreeTier ? 'Free Plan' : isSubscribed ? 'Active Subscription' : `Free Trial — ${trialStatus.daysLeft} days left`}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>{userRecord?.lifetime_access ? 'You have permanent access to every feature, no billing involved.' : isFreeTier ? '1 property, free forever. Upgrade any time for more properties.' : isSubscribed ? 'Your subscription is active.' : 'Upgrade to keep access after your trial ends.'}</p>
               </div>
-              <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{userRecord?.lifetime_access ? '✓ Lifetime' : isSubscribed ? '✓ Active' : 'Trial'}</span>
+              <span style={{ background: isSubscribed ? 'rgba(34,197,94,0.15)' : 'rgba(43,124,211,0.15)', color: isSubscribed ? '#22c55e' : blue, padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{userRecord?.lifetime_access ? '✓ Lifetime' : isFreeTier ? 'Free' : isSubscribed ? '✓ Active' : 'Trial'}</span>
             </div>
             {!isSubscribed && (
               <button onClick={() => setForcePaywall(true)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
                 {subscribing ? 'Loading…' : 'Choose a plan'}
               </button>
             )}
-            {isSubscribed && !userRecord?.lifetime_access && (
+            {isFreeTier && (
+              <button onClick={() => setForcePaywall(true)} disabled={subscribing} style={{ marginTop: '14px', padding: '10px 20px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: subscribing ? 0.7 : 1 }}>
+                {subscribing ? 'Loading…' : 'Upgrade plan'}
+              </button>
+            )}
+            {isSubscribed && !isFreeTier && !userRecord?.lifetime_access && (
               <button onClick={handleManageSubscription} disabled={portalLoading} style={{ marginTop: '14px', padding: '10px 20px', background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: portalLoading ? 0.7 : 1 }}>
                 {portalLoading ? 'Loading…' : 'Manage subscription'}
               </button>
@@ -6225,10 +6298,12 @@ function App() {
             <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <h1 style={{ color: '#0f1e30', textAlign: 'center', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Create your account</h1>
-          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>Start your 7-day free trial</p>
+          <p style={{ textAlign: 'center', color: '#888', fontSize: '14px', marginBottom: '20px', marginTop: '-8px' }}>
+            {accountType === 'landlord' && startFree ? 'Free forever — 1 property, no card needed' : 'Start your 7-day free trial'}
+          </p>
 
           {/* Account type selector */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: accountType === 'landlord' ? '10px' : '20px' }}>
             <button onClick={() => setAccountType('landlord')} style={{ flex: 1, padding: '10px', background: accountType === 'landlord' ? '#0f1e30' : '#f8fafc', color: accountType === 'landlord' ? 'white' : '#666', border: `2px solid ${accountType === 'landlord' ? '#0f1e30' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
               🏠 I'm a Landlord
             </button>
@@ -6236,6 +6311,18 @@ function App() {
               🏢 I'm a Letting Agent
             </button>
           </div>
+          {/* Free tier choice — landlords only, added 2026-08-06. Lets people skip the
+              7-day trial entirely and go straight to a free-forever 1-property account. */}
+          {accountType === 'landlord' && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              <button type="button" onClick={() => setStartFree(false)} style={{ flex: 1, padding: '8px', background: !startFree ? '#eff6ff' : '#f8fafc', color: !startFree ? '#0f1e30' : '#999', border: `2px solid ${!startFree ? '#2b7cd3' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                7-day free trial
+              </button>
+              <button type="button" onClick={() => setStartFree(true)} style={{ flex: 1, padding: '8px', background: startFree ? '#eff6ff' : '#f8fafc', color: startFree ? '#0f1e30' : '#999', border: `2px solid ${startFree ? '#2b7cd3' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: 'pointer' }}>
+                Free forever (1 property)
+              </button>
+            </div>
+          )}
           {accountType === 'agent' && (
             <input type="text" placeholder="Agency name (e.g. Shepherd Sharpe)" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} style={lightInputStyle} />
           )}
@@ -6261,7 +6348,7 @@ function App() {
             <option value="other">Other</option>
           </select>
           <button onClick={handleSignUp} disabled={loading} style={{ width: '100%', padding: '14px', background: '#0f1e30', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontFamily: font, fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Creating account…' : 'Create Account'}
+            {loading ? 'Creating account…' : (accountType === 'landlord' && startFree ? 'Create Free Account' : 'Create Account')}
           </button>
           <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
             Already have an account?{' '}
