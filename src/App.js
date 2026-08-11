@@ -3437,12 +3437,12 @@ function App() {
 
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px', textAlign: 'left' }}>
               <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '15px' }}>One quick thing</p>
-              <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Roughly how many properties does your agency manage? We'll point you to the right plan, no pressure, you're on a free trial either way.</p>
+              <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>Roughly how many properties does your agency manage? Just helps us understand your agency, Agent Access is free either way.</p>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'small', label: 'Under 50', tier: 'Agent Starter', price: '£499/yr' },
-                  { id: 'mid', label: '50–200', tier: 'Agent Pro', price: '£999/yr' },
-                  { id: 'large', label: '200+', tier: 'Agent Portfolio', price: '£1,999/yr' },
+                  { id: 'small', label: 'Under 50' },
+                  { id: 'mid', label: '50–200' },
+                  { id: 'large', label: '200+' },
                 ].map(opt => (
                   <button key={opt.id} onClick={() => setAgentOnboardSizeAnswer(opt)} style={{
                     padding: '10px 18px', borderRadius: '10px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer',
@@ -3457,8 +3457,8 @@ function App() {
               </div>
               {agentOnboardSizeAnswer && (
                 <div style={{ marginTop: '14px', padding: '12px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: '600' }}>✓ We'd suggest <strong>{agentOnboardSizeAnswer.tier}</strong> ({agentOnboardSizeAnswer.price}) for that</span>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>You can always change this later in Settings</span>
+                  <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: '600' }}>✓ Thanks, that's noted</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Agent Access stays free, no plan to choose</span>
                 </div>
               )}
             </div>
