@@ -660,6 +660,43 @@ function ViewDocButton({ doc, resolveUrl, style }) {
   );
 }
 
+// EICR classification codes, read off the observations page by the AI scan (extract-document-dates).
+// C1/C2 mean the report is unsatisfactory and remedial work is legally required — see EICR_C1_C2_Spec.
+const EICR_CODE_META = {
+  C1: { label: 'C1 — Danger present', short: 'immediate action required', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.4)', severe: true },
+  C2: { label: 'C2 — Potentially dangerous', short: 'urgent action required', color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.4)', severe: true },
+  C3: { label: 'C3 — Improvement recommended', short: 'not a legal requirement', color: '#eab308', bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.35)', severe: false },
+  FI: { label: 'FI — Further investigation required', short: 'needs a follow-up inspection', color: '#eab308', bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.35)', severe: false },
+};
+
+// Shown right after an AI scan of an EICR that came back with a C1/C2/C3/FI code, so the
+// landlord (or agent) sees it before they save, not buried in the document later.
+function EicrAlert({ code, summary, deadline, confidence }) {
+  const meta = EICR_CODE_META[code];
+  if (!meta) return null;
+  return (
+    <div style={{ background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+      <p style={{ margin: '0 0 4px', color: meta.color, fontSize: '13px', fontWeight: '800' }}>{meta.severe ? '⚠ ' : 'ℹ '}{meta.label}</p>
+      {summary && <p style={{ margin: '0 0 4px', color: 'rgba(255,255,255,0.8)', fontSize: '12px', lineHeight: '1.5' }}>{summary}</p>}
+      {deadline && <p style={{ margin: '0 0 4px', color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Remediation deadline noted on report: {new Date(deadline).toLocaleDateString('en-GB')}</p>}
+      {confidence === 'low' && <p style={{ margin: 0, color: '#fbbf24', fontSize: '11px' }}>⚠ The AI wasn't fully confident reading the observations page — check this against the actual certificate.</p>}
+    </div>
+  );
+}
+
+// Compact badge for document list rows. Only C1/C2 get a persistent badge — those are the
+// unsatisfactory, legally-actionable codes. C3/FI surface in the fuller EicrAlert at upload
+// time but don't get a standing badge, so the list doesn't cry wolf on lower-severity findings.
+function EicrBadge({ doc }) {
+  const meta = EICR_CODE_META[doc?.eicr_code];
+  if (!meta || !meta.severe) return null;
+  return (
+    <span title={doc.eicr_summary || meta.short} style={{ background: meta.bg, color: meta.color, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>
+      ⚠ {doc.eicr_code}
+    </span>
+  );
+}
+
 // Signs a URL for a document the current signed-in user is allowed to read.
 const signDocumentUrl = async (doc) => {
   if (!doc?.file_path) return null;
@@ -729,6 +766,7 @@ function AgentView({ token }) {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <EicrBadge doc={doc} />
                 {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
                 {doc.file_path && <ViewDocButton doc={doc} resolveUrl={(d) => sharedDocUrls[d.id] || null} />}
               </div>
@@ -969,6 +1007,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
           <p style={{ margin: 0, color: 'white', fontSize: '14px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.document_type}</p>
           <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property?.address_line_1} · {doc.expiry_date ? `Due ${new Date(doc.expiry_date).toLocaleDateString('en-GB')}` : 'No expiry set'}</p>
         </div>
+        <EicrBadge doc={doc} />
         {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{status.label}</span>}
       </div>
     );
@@ -1738,6 +1777,10 @@ function App() {
       document_type: finalDocType,
       file_path: filePath,
       expiry_date: agentNoExpiry ? null : (agentExpiryDate || null),
+      eicr_code: agentScanResult?.eicr_code || null,
+      eicr_summary: agentScanResult?.eicr_summary || null,
+      eicr_deadline: agentScanResult?.eicr_deadline || null,
+      eicr_confidence: agentScanResult?.eicr_confidence || null,
     }]);
     if (dbError) { alert(dbError.message); setAgentUploading(false); return; }
 
@@ -3148,7 +3191,17 @@ function App() {
     const { error: storageError } = await supabase.storage.from('documents').upload(filePath, uploadFile);
     if (storageError) { alert(storageError.message); setUploading(false); return; }
     const finalDocType = docType === 'Other' && customDocType.trim() ? customDocType.trim() : docType;
-    const { error: dbError } = await supabase.from('documents').insert([{ property_id: selectedProperty.id, user_id: user.id, document_type: finalDocType, file_path: filePath, expiry_date: noExpiry ? null : (expiryDate || null) }]);
+    const { error: dbError } = await supabase.from('documents').insert([{
+      property_id: selectedProperty.id,
+      user_id: user.id,
+      document_type: finalDocType,
+      file_path: filePath,
+      expiry_date: noExpiry ? null : (expiryDate || null),
+      eicr_code: scanResult?.eicr_code || null,
+      eicr_summary: scanResult?.eicr_summary || null,
+      eicr_deadline: scanResult?.eicr_deadline || null,
+      eicr_confidence: scanResult?.eicr_confidence || null,
+    }]);
     if (dbError) { alert(dbError.message); setUploading(false); return; }
     const { data: updatedDocs } = await supabase.from('documents').select('*').eq('property_id', selectedProperty.id);
     if (updatedDocs) { setDocuments(updatedDocs); await loadAllDocuments(properties); }
@@ -3795,12 +3848,15 @@ function App() {
                     )}
 
                     {agentScanResult && (
-                      <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
-                        <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
-                        {agentScanResult.confidence === 'low' && (
-                          <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
-                        )}
-                      </div>
+                      <>
+                        <EicrAlert code={agentScanResult.eicr_code} summary={agentScanResult.eicr_summary} deadline={agentScanResult.eicr_deadline} confidence={agentScanResult.eicr_confidence} />
+                        <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                          <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
+                          {agentScanResult.confidence === 'low' && (
+                            <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
+                          )}
+                        </div>
+                      </>
                     )}
                     {agentScanError && (
                       <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '-4px', marginBottom: '12px' }}>{agentScanError}</p>
@@ -3831,6 +3887,7 @@ function App() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <EicrBadge doc={doc} />
                         {status && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
                         {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
                       </div>
@@ -5123,6 +5180,9 @@ function App() {
                       <p style={{ margin: 0, fontWeight: '700', color: 'white', fontSize: '14px' }}>{doc.document_type}</p>
                       {doc.expiry_date && <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: '12px' }}>Expires: {new Date(doc.expiry_date).toLocaleDateString('en-GB')}</p>}
                       {!doc.expiry_date && <p style={{ margin: '2px 0 0', color: '#eab308', fontSize: '12px' }}>⚠ No expiry date set</p>}
+                      {(doc.eicr_code === 'C3' || doc.eicr_code === 'FI') && (
+                        <p style={{ margin: '2px 0 0', color: 'rgba(234,179,8,0.85)', fontSize: '11px' }}>{EICR_CODE_META[doc.eicr_code].label}</p>
+                      )}
                       {doc.document_type === 'Deposit Certificate' && (
                         <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <a href="https://www.tenancydepositscheme.com" target="_blank" rel="noreferrer" style={{ color: blue, fontSize: '11px', fontWeight: '600', background: 'rgba(43,124,211,0.1)', padding: '3px 8px', borderRadius: '4px', textDecoration: 'none' }}>TDS →</a>
@@ -5133,6 +5193,7 @@ function App() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <EicrBadge doc={doc} />
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
                     {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
                     <button onClick={() => handleEditDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
@@ -5188,15 +5249,18 @@ function App() {
               )}
 
               {scanResult && (
-                <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
-                  <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
-                  {scanResult.confidence === 'low' && (
-                    <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
-                  )}
-                  {scanResult.notes && (
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{scanResult.notes}</p>
-                  )}
-                </div>
+                <>
+                  <EicrAlert code={scanResult.eicr_code} summary={scanResult.eicr_summary} deadline={scanResult.eicr_deadline} confidence={scanResult.eicr_confidence} />
+                  <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+                    <p style={{ margin: '0 0 4px', color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>✓ Scanned — please check this is correct before saving</p>
+                    {scanResult.confidence === 'low' && (
+                      <p style={{ margin: '0 0 4px', color: '#fbbf24', fontSize: '12px' }}>⚠ Low confidence — double-check the date below carefully.</p>
+                    )}
+                    {scanResult.notes && (
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{scanResult.notes}</p>
+                    )}
+                  </div>
+                </>
               )}
               {scanError && (
                 <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px' }}>
