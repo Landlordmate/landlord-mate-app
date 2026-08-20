@@ -258,7 +258,7 @@ function isAndroid() {
   return /android/i.test(navigator.userAgent);
 }
 
-function CompliancePieChart({ documents }) {
+function CompliancePieChart({ documents, onSegmentClick }) {
   const expired = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
   const urgent = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
   const soon = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'soon').length;
@@ -267,12 +267,15 @@ function CompliancePieChart({ documents }) {
   const total = documents.length;
   if (total === 0) return null;
   const size = 180, cx = 90, cy = 90, r = 66, innerR = 39;
-  const segments = [
-    { count: good, color: '#22c55e', label: 'Compliant' },
-    { count: soon, color: '#eab308', label: 'Expiring Soon' },
-    { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
-    { count: noExpiry, color: '#4a9eff', label: 'No Expiry' },
-  ].filter(s => s.count > 0);
+  // filterKey maps each slice to the "properties" screen filter it should open —
+  // keep in sync with the landlordPropFilter cases on the Properties screen.
+  const legendItems = [
+    { count: good, color: '#22c55e', label: 'Compliant', filterKey: 'green' },
+    { count: soon, color: '#eab308', label: 'Expiring Soon', filterKey: 'amber' },
+    { count: urgent + expired, color: '#ef4444', label: 'Action Needed', filterKey: 'red' },
+    { count: noExpiry, color: '#4a9eff', label: 'No Expiry Set', filterKey: 'noexpiry' },
+  ];
+  const segments = legendItems.filter(s => s.count > 0);
   let startAngle = -Math.PI / 2;
   const paths = segments.map(seg => {
     const angle = (seg.count / total) * 2 * Math.PI;
@@ -286,24 +289,39 @@ function CompliancePieChart({ documents }) {
     startAngle = endAngle;
     return { ...seg, d };
   });
+  const handleClick = (filterKey) => { if (onSegmentClick) onSegmentClick(filterKey); };
   return (
     <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px' }}>
       <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', margin: '0 0 16px' }}>Compliance Overview</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-          {paths.map((p, i) => <path key={i} d={p.d} fill={p.color} opacity="0.9" />)}
+          {paths.map((p, i) => (
+            <path
+              key={i}
+              d={p.d}
+              fill={p.color}
+              opacity="0.9"
+              onClick={() => handleClick(p.filterKey)}
+              style={{ cursor: onSegmentClick ? 'pointer' : 'default' }}
+              onMouseEnter={e => { if (onSegmentClick) e.currentTarget.setAttribute('opacity', '1'); }}
+              onMouseLeave={e => e.currentTarget.setAttribute('opacity', '0.9')}
+            >
+              <title>{`${p.label}: ${p.count}`}</title>
+            </path>
+          ))}
           <circle cx={cx} cy={cy} r={innerR - 2} fill="#0f1e30" />
           <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize="20" fontWeight="900" fontFamily="Nunito, sans-serif">{total}</text>
           <text x={cx} y={cy + 12} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="11" fontFamily="Nunito, sans-serif">DOCS</text>
         </svg>
         <div style={{ flex: 1, minWidth: '140px' }}>
-          {[
-            { count: good, color: '#22c55e', label: 'Compliant' },
-            { count: soon, color: '#eab308', label: 'Expiring Soon' },
-            { count: urgent + expired, color: '#ef4444', label: 'Action Needed' },
-            { count: noExpiry, color: '#4a9eff', label: 'No Expiry Set' },
-          ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          {legendItems.map((item, i) => (
+            <div
+              key={i}
+              onClick={() => handleClick(item.filterKey)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: onSegmentClick ? 'pointer' : 'default', borderRadius: '6px', padding: '2px 4px', marginLeft: '-4px' }}
+              onMouseEnter={e => { if (onSegmentClick) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
               <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', flex: 1 }}>{item.label}</span>
               <span style={{ color: 'white', fontWeight: '800', fontSize: '13px' }}>{item.count}</span>
@@ -978,7 +996,7 @@ function AskAnythingWidget({ properties, forceWales }) {
   );
 }
 
-function Dashboard({ properties, documents, setScreen, setSelectedProperty, handleSelectProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport }) {
+function Dashboard({ properties, documents, setScreen, setSelectedProperty, handleSelectProperty, userName, showHomeBanner, onDismissBanner, trialDaysLeft, showTrialNudge, onSubscribe, onPrintReport, onGoToFilteredProperties }) {
   const [showAgentShareModal, setShowAgentShareModal] = useState(false);
   const byExpirySoonest = (a, b) => new Date(a.expiry_date) - new Date(b.expiry_date);
   const expiredDocs = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').sort(byExpirySoonest);
@@ -1091,7 +1109,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
         })}
       </div>
 
-      {documents.length > 0 && <CompliancePieChart documents={documents} />}
+      {documents.length > 0 && <CompliancePieChart documents={documents} onSegmentClick={onGoToFilteredProperties} />}
 
       <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '14px', padding: '20px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         <div>
@@ -5377,7 +5395,7 @@ function App() {
             </div>
           </div>
 
-          {properties.length > 5 && (
+          {(properties.length > 5 || landlordPropFilter !== 'all') && (
             <div style={{
               display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center',
               background: 'linear-gradient(135deg, rgba(43,124,211,0.08), rgba(139,92,246,0.06))',
@@ -5408,6 +5426,7 @@ function App() {
                 { id: 'red', label: '🔴 Action Needed', color: '#ef4444', glow: 'rgba(239,68,68,0.4)' },
                 { id: 'amber', label: '🟡 Expiring Soon', color: '#eab308', glow: 'rgba(234,179,8,0.4)' },
                 { id: 'green', label: '🟢 Compliant', color: '#22c55e', glow: 'rgba(34,197,94,0.4)' },
+                { id: 'noexpiry', label: '🔵 No Expiry Set', color: '#4a9eff', glow: 'rgba(74,158,255,0.4)' },
                 { id: 'none', label: '⚪ No Docs', color: 'rgba(255,255,255,0.5)', glow: 'rgba(255,255,255,0.15)' },
               ].map(f => {
                 const active = landlordPropFilter === f.id;
@@ -5495,6 +5514,7 @@ function App() {
               if (landlordPropFilter === 'all') return true;
               const docs = allDocuments.filter(d => d.property_id === p.id);
               if (landlordPropFilter === 'none') return docs.length === 0;
+              if (landlordPropFilter === 'noexpiry') return docs.some(d => !d.expiry_date);
               if (docs.length === 0) return false;
               const score = getComplianceScore(docs);
               if (landlordPropFilter === 'green') return score >= 80;
@@ -6302,6 +6322,11 @@ function App() {
           onPrintReport={() => setShowPrintReport(true)}
           setSelectedProperty={(p) => handleSelectProperty(p)}
           handleSelectProperty={handleSelectProperty}
+          onGoToFilteredProperties={(filterId) => {
+            setLandlordPropSearch('');
+            setLandlordPropFilter(filterId);
+            setScreen('properties');
+          }}
         />
       </AppShell>
     );
