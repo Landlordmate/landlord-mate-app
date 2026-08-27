@@ -1447,6 +1447,7 @@ function App() {
   const [agencyLogoUrl, setAgencyLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoSaved, setLogoSaved] = useState(false);
+  const [agencyLogoError, setAgencyLogoError] = useState('');
   const [landlordLogoUrl, setLandlordLogoUrl] = useState('');
   const [landlordLogoSaved, setLandlordLogoSaved] = useState(false);
   const [landlordLogoError, setLandlordLogoError] = useState('');
@@ -2035,21 +2036,36 @@ function App() {
   const handleAgencyLogoSave = async () => {
     if (!pendingAgencyLogo) return;
     setUploadingLogo(true);
-    const ext = pendingAgencyLogo.name.split('.').pop();
-    const path = `${user.id}.${ext}`;
-    const { error } = await supabase.storage.from('logos').upload(path, pendingAgencyLogo, { upsert: true });
-    if (!error) {
+    setAgencyLogoError('');
+    try {
+      const ext = pendingAgencyLogo.name.split('.').pop();
+      const path = `${user.id}.${ext}`;
+      const { error } = await supabase.storage.from('logos').upload(path, pendingAgencyLogo, { upsert: true });
+      if (error) {
+        console.error('Agency logo upload error:', error);
+        setAgencyLogoError(`Upload failed: ${error.message || 'please try again.'}`);
+        return;
+      }
       const { data } = supabase.storage.from('logos').getPublicUrl(path);
-      await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      const { error: dbError } = await supabase.from('users').update({ logo_url: data.publicUrl }).eq('id', user.id);
+      if (dbError) {
+        console.error('Agency logo DB update error:', dbError);
+        setAgencyLogoError('Saved the image but failed to update your profile. Please try again.');
+        return;
+      }
       const bustedUrl = `${data.publicUrl}?t=${Date.now()}`;
       setAgencyLogoUrl(bustedUrl);
       setUserRecord({ ...userRecord, logo_url: bustedUrl });
       setLogoSaved(true);
       setTimeout(() => setLogoSaved(false), 3000);
+      setPendingAgencyLogo(null);
+      setPendingAgencyLogoPreview('');
+    } catch (err) {
+      console.error('Agency logo save error:', err);
+      setAgencyLogoError(`Something went wrong: ${err.message || 'please try again.'}`);
+    } finally {
+      setUploadingLogo(false);
     }
-    setPendingAgencyLogo(null);
-    setPendingAgencyLogoPreview('');
-    setUploadingLogo(false);
   };
 
   const handleAgencyLogoRemove = async () => {
@@ -4352,6 +4368,7 @@ function App() {
                 {pendingAgencyLogoPreview && <button onClick={() => { setPendingAgencyLogo(null); setPendingAgencyLogoPreview(''); }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, cursor: 'pointer' }}>Cancel</button>}
               </div>
               {logoSaved && <p style={{ color: '#22c55e', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>✓ Logo saved!</p>}
+              {agencyLogoError && <p style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700', margin: '0 0 8px' }}>{agencyLogoError}</p>}
               <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '12px 16px' }}>
                 <p style={{ margin: '0 0 4px', color: '#7db3e8', fontSize: '13px', fontWeight: '700' }}>Your Agent Code</p>
                 <p style={{ margin: 0, color: 'white', fontSize: '13px', fontFamily: 'monospace' }}>{userRecord?.agent_code}</p>
