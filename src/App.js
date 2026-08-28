@@ -258,6 +258,116 @@ function isAndroid() {
   return /android/i.test(navigator.userAgent);
 }
 
+// Bulk document upload — see claude_Bulk_Document_Upload_Spec.md
+const BULK_MAX_FILES = 20;
+const BULK_MAX_FILE_MB = 15;
+const BULK_CONCURRENCY = 3;
+
+// Runs `worker` over `items` with at most `limit` in flight at once. Unlike
+// Promise.all, callers update their own state inside `worker` as each item
+// resolves, so a UI list can fill in live instead of waiting for the batch.
+async function runWithConcurrency(items, limit, worker) {
+  let cursor = 0;
+  async function next() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      await worker(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, next));
+}
+
+const BULK_ACCEPTED_EXTENSIONS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'heic', 'heif']);
+
+// A plain drag-and-drop of a FOLDER doesn't populate DataTransfer.files the way
+// dropping individual files does — the browser only exposes folder contents via
+// the (Chromium/Firefox/Safari-supported but non-standard) webkitGetAsEntry
+// directory API, which has to be read recursively and asynchronously. Falls
+// straight back to dataTransfer.files wherever that API isn't available.
+async function getFilesFromDataTransfer(dataTransfer) {
+  const items = dataTransfer.items;
+  if (!items || items.length === 0 || typeof items[0].webkitGetAsEntry !== 'function') {
+    return Array.from(dataTransfer.files || []);
+  }
+  const entries = Array.from(items).map(item => item.webkitGetAsEntry && item.webkitGetAsEntry()).filter(Boolean);
+  if (entries.length === 0) return Array.from(dataTransfer.files || []);
+
+  const readEntryFile = (entry) => new Promise((resolve) => entry.file(resolve, () => resolve(null)));
+  const readDirBatch = (reader) => new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+
+  const collect = async (entry) => {
+    if (entry.isFile) {
+      const file = await readEntryFile(entry);
+      return file ? [file] : [];
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let dirEntries = [];
+      // readEntries only returns a batch at a time — must be called
+      // repeatedly until it comes back empty to get everything.
+      for (let batch = await readDirBatch(reader); batch.length > 0; batch = await readDirBatch(reader)) {
+        dirEntries = dirEntries.concat(batch);
+      }
+      const nested = await Promise.all(dirEntries.map(collect));
+      return nested.flat();
+    }
+    return [];
+  };
+
+  const collected = await Promise.all(entries.map(collect));
+  return collected.flat();
+}
+
+// Lowercase, strip punctuation, collapse whitespace — for comparing a house
+// number + street line read off a certificate against a property's address.
+function normalizeForMatch(str) {
+  if (!str) return '';
+  return str.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizePostcode(str) {
+  if (!str) return '';
+  return str.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+// Property-matching rules for bulk upload, run per document (not per batch),
+// stopping at the first hit. Rule 4 ("user has exactly one property total")
+// doesn't depend on the document at all, so it's applied by the caller
+// before this is reached. Never silently guesses past "medium" confidence —
+// a certificate filed against the wrong flat is worse than one left unassigned.
+function matchDocumentToProperty(detectedAddress, detectedPostcode, properties) {
+  const live = properties.filter(p => !p.deleted_at);
+
+  if (detectedPostcode) {
+    const pc = normalizePostcode(detectedPostcode);
+    const postcodeMatches = live.filter(p => p.postcode && normalizePostcode(p.postcode) === pc);
+    if (postcodeMatches.length === 1) {
+      return { propertyId: postcodeMatches[0].id, confidence: 'high', candidates: [] };
+    }
+    if (postcodeMatches.length > 1) {
+      return { propertyId: null, confidence: 'none', candidates: postcodeMatches };
+    }
+  }
+
+  if (detectedAddress) {
+    const normalizedAddress = normalizeForMatch(detectedAddress);
+    const addressMatches = live.filter(p => {
+      const line = normalizeForMatch(`${p.address_line_1 || ''} ${p.address_line_2 || ''}`);
+      if (!line) return false;
+      // A house number + street line match: every "word" of the property's
+      // line 1 (typically "12 elm street") appears in the detected address.
+      const propWords = normalizeForMatch(p.address_line_1 || '').split(' ').filter(Boolean);
+      const everyWordPresent = propWords.length > 0 && propWords.every(w => normalizedAddress.includes(w));
+      return everyWordPresent || normalizedAddress.includes(line);
+    });
+    if (addressMatches.length === 1) {
+      return { propertyId: addressMatches[0].id, confidence: 'medium', candidates: [] };
+    }
+  }
+
+  return { propertyId: null, confidence: 'none', candidates: [] };
+}
+
 function CompliancePieChart({ documents, onSegmentClick }) {
   const expired = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'expired').length;
   const urgent = documents.filter(d => getExpiryStatus(d.expiry_date)?.type === 'urgent').length;
@@ -723,6 +833,60 @@ const signDocumentUrl = async (doc) => {
   return data?.signedUrl || null;
 };
 
+// Searchable property picker for the bulk-upload review table — a plain <select>
+// doesn't scale to an agent's full portfolio, and flats in the same building need
+// both address lines visible to tell them apart (see the bulk upload spec, 4c(ii)).
+function SearchablePropertySelect({ properties, value, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef(null);
+
+  const selected = properties.find(p => p.id === value) || null;
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const displayLabel = (p) => [p.address_line_1, p.address_line_2].filter(Boolean).join(', ');
+  const filterText = normalizeForMatch(query);
+  const filtered = query
+    ? properties.filter(p => normalizeForMatch(`${p.address_line_1 || ''} ${p.address_line_2 || ''} ${p.postcode || ''} ${p.city || ''}`).includes(filterText))
+    : properties;
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        placeholder={placeholder || 'Search properties…'}
+        value={open ? query : (selected ? displayLabel(selected) : '')}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ width: '100%', padding: '9px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box' }}
+      />
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: '#132840', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', marginTop: '4px', maxHeight: '220px', overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+          {filtered.length === 0 && <p style={{ padding: '10px 12px', margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>No matching properties</p>}
+          {filtered.map(p => (
+            <div
+              key={p.id}
+              onClick={() => { onChange(p.id); setOpen(false); setQuery(''); }}
+              style={{ padding: '9px 12px', cursor: 'pointer', fontSize: '13px', color: 'white', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(43,124,211,0.15)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {displayLabel(p)}{p.postcode ? ` — ${p.postcode}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AgentView({ token }) {
   const [property, setProperty] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -853,6 +1017,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
         {navItem('dashboard', '📊', 'Dashboard', urgentCount)}
         {navItem('askmate', '💬', 'Ask Mate')}
         {navItem('properties', '🏠', 'All Properties')}
+        {navItem('bulk-upload', '📦', 'Bulk Upload')}
         <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10px', fontWeight: '800', letterSpacing: '2px', padding: '0 20px', margin: '16px 0 8px' }}>RESOURCES</p>
         {navItem('landlordocs', '🪪', 'My Documents')}
         {isWalesRelevant(properties) && navItem('wales', '🏴󠁧󠁢󠁷󠁬󠁳󠁥', 'Wales Compliance')}
@@ -1046,12 +1211,20 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
           </p>
         </div>
         {properties.length > 0 && (
-          <button
-            onClick={() => setShowAgentShareModal(true)}
-            style={{ background: blue, color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
-          >
-            🔗 Share with your agent
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setScreen('bulk-upload')}
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+            >
+              📦 Bulk Upload
+            </button>
+            <button
+              onClick={() => setShowAgentShareModal(true)}
+              style={{ background: blue, color: 'white', border: 'none', borderRadius: '10px', padding: '12px 20px', fontSize: '13px', fontFamily: font, fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+            >
+              🔗 Share with your agent
+            </button>
+          </div>
         )}
       </div>
 
@@ -1175,6 +1348,337 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 20px' }}>Add a property and upload your compliance certificates</p>
           <button onClick={() => setScreen('properties')} style={{ background: blue, color: 'white', border: 'none', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: font }}>Add your first property</button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Bulk document upload — see claude_Bulk_Document_Upload_Spec.md. Drops in a folder
+// of certificates, scans each one (3 at a time) against extract-document-dates,
+// matches it to a property, and holds everything in an editable review table —
+// nothing saves to public.documents until "Save all" is pressed.
+function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropertyActionMessage }) {
+  const isMobile = useIsMobile();
+  const [rows, setRows] = useState([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [dropNotice, setDropNotice] = useState('');
+  const [saving, setSaving] = useState(false);
+  const batchIdRef = useRef(crypto.randomUUID());
+  const liveProperties = properties.filter(p => !p.deleted_at);
+
+  const miniInputStyle = { width: '100%', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box' };
+
+  const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+
+  const processRow = async (row) => {
+    setRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'scanning', error: null } : r));
+    try {
+      const fileBase64 = await readFileAsBase64(row.file);
+      const mimeType = row.file.type || 'application/octet-stream';
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-document-dates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ fileBase64, mimeType, batchId: batchIdRef.current, fileName: row.fileName }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'failed', error: data.error || 'Could not scan this document.' } : r));
+        return;
+      }
+      // Rule 4: a single-property portfolio doesn't need address matching at all.
+      const match = liveProperties.length === 1
+        ? { propertyId: liveProperties[0].id, confidence: 'medium', candidates: [] }
+        : matchDocumentToProperty(data.detected_address, data.detected_postcode, properties);
+      const docTypeKnown = DOC_TYPES.includes(data.document_type);
+      setRows(prev => prev.map(r => r.id === row.id ? {
+        ...r,
+        status: 'done',
+        documentType: docTypeKnown ? data.document_type : 'Other',
+        customDocType: docTypeKnown ? '' : (data.document_type || ''),
+        typeConfidence: data.type_confidence || null,
+        typeSource: 'ai',
+        expiryDate: data.expiry_date || '',
+        expirySource: data.expiry_source || null,
+        propertyId: match.propertyId,
+        propertyConfidence: match.confidence,
+        propertySource: 'auto',
+        propertyCandidates: match.candidates,
+        detectedAddress: data.detected_address || null,
+        eicrCode: data.eicr_code || null,
+        eicrSummary: data.eicr_summary || null,
+        eicrDeadline: data.eicr_deadline || null,
+        eicrConfidence: data.eicr_confidence || null,
+        notes: data.notes || '',
+      } : r));
+    } catch (e) {
+      setRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'failed', error: 'Could not scan this document. Please retry.' } : r));
+    }
+  };
+
+  const handleFiles = (fileList) => {
+    const rawIncoming = Array.from(fileList || []);
+    if (rawIncoming.length === 0) return;
+    // Folder drops pull in whatever's alongside the certificates — .DS_Store,
+    // spreadsheets, whatever — so filter to what the pipeline can actually read.
+    const incoming = rawIncoming.filter(f => BULK_ACCEPTED_EXTENSIONS.has((f.name.split('.').pop() || '').toLowerCase()));
+    if (incoming.length === 0) {
+      setDropNotice("Nothing there we can read — we're looking for PDF, JPG, PNG or HEIC files.");
+      return;
+    }
+    const roomLeft = BULK_MAX_FILES - rows.length;
+    let toAdd = incoming;
+    if (incoming.length > roomLeft) {
+      toAdd = incoming.slice(0, Math.max(roomLeft, 0));
+      setDropNotice(`We'll do these ${BULK_MAX_FILES} now, then you can add the rest.`);
+    } else {
+      setDropNotice('');
+    }
+    const newRows = toAdd.map(file => {
+      const oversize = file.size > BULK_MAX_FILE_MB * 1024 * 1024;
+      return {
+        id: crypto.randomUUID(),
+        file,
+        fileName: file.name,
+        fileSize: file.size,
+        status: oversize ? 'failed' : 'queued',
+        error: oversize ? `This file is over ${BULK_MAX_FILE_MB}MB — please upload it individually from the property page.` : null,
+        documentType: DOC_TYPES[0],
+        customDocType: '',
+        typeConfidence: null,
+        typeSource: 'ai',
+        expiryDate: '',
+        expirySource: null,
+        propertyId: null,
+        propertyConfidence: 'none',
+        propertySource: 'auto',
+        propertyCandidates: [],
+        detectedAddress: null,
+        eicrCode: null,
+        eicrSummary: null,
+        eicrDeadline: null,
+        eicrConfidence: null,
+        notes: '',
+        saveError: null,
+      };
+    });
+    setRows(prev => [...prev, ...newRows]);
+    const toProcess = newRows.filter(r => r.status === 'queued');
+    runWithConcurrency(toProcess, BULK_CONCURRENCY, processRow);
+  };
+
+  const updateRow = (id, patch) => setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  const handleDeleteRow = (id) => setRows(prev => prev.filter(r => r.id !== id));
+  const handleRetryRow = (id) => {
+    const row = rows.find(r => r.id === id);
+    if (row) processRow(row);
+  };
+
+  const isRowSaveable = (r) => r.status === 'done' && !!r.propertyId && !!r.documentType && (r.documentType !== 'Other' || r.customDocType.trim());
+  const blockingCount = rows.filter(r => !isRowSaveable(r)).length;
+
+  const handleSaveAll = async () => {
+    const validRows = rows.filter(isRowSaveable);
+    if (validRows.length === 0) return;
+    setSaving(true);
+    const savedIds = [];
+    const failedIds = [];
+    const errorMessages = {};
+    await runWithConcurrency(validRows, BULK_CONCURRENCY, async (row, i) => {
+      try {
+        const ext = row.fileName.includes('.') ? row.fileName.split('.').pop() : 'dat';
+        const filePath = `${user.id}/${row.propertyId}/${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+        const { error: storageError } = await supabase.storage.from('documents').upload(filePath, row.file);
+        if (storageError) throw storageError;
+        const finalDocType = row.documentType === 'Other' && row.customDocType.trim() ? row.customDocType.trim() : row.documentType;
+        const { error: dbError } = await supabase.from('documents').insert([{
+          property_id: row.propertyId,
+          user_id: user.id,
+          document_type: finalDocType,
+          file_path: filePath,
+          expiry_date: row.expiryDate || null,
+          eicr_code: row.eicrCode || null,
+          eicr_summary: row.eicrSummary || null,
+          eicr_deadline: row.eicrDeadline || null,
+          eicr_confidence: row.eicrConfidence || null,
+          type_confidence: row.typeConfidence || null,
+          type_source: row.typeSource || 'ai',
+          expiry_source: row.expirySource || null,
+          detected_address: row.detectedAddress || null,
+          upload_batch_id: batchIdRef.current,
+        }]);
+        if (dbError) throw dbError;
+        savedIds.push(row.id);
+      } catch (e) {
+        failedIds.push(row.id);
+        errorMessages[row.id] = e.message || 'Could not save this document.';
+      }
+    });
+    setRows(prev => prev.filter(r => !savedIds.includes(r.id)).map(r => failedIds.includes(r.id) ? { ...r, saveError: errorMessages[r.id] } : r));
+    setSaving(false);
+    if (failedIds.length === 0) {
+      await refreshData();
+      const propCount = new Set(validRows.map(r => r.propertyId)).size;
+      setPropertyActionMessage(`✓ ${savedIds.length} document${savedIds.length === 1 ? '' : 's'} added across ${propCount} propert${propCount === 1 ? 'y' : 'ies'}.`);
+      setScreen('properties');
+    }
+  };
+
+  const isRowAmber = (r) => (r.typeSource === 'ai' && r.typeConfidence && r.typeConfidence !== 'high')
+    || r.expirySource === 'derived'
+    || (r.propertySource === 'auto' && r.propertyConfidence === 'medium');
+
+  const rowPriority = (r) => {
+    if (r.status === 'failed') return 0;
+    if (r.status !== 'done') return 1;
+    if (!isRowSaveable(r) || isRowAmber(r)) return 2;
+    return 3;
+  };
+
+  const rowColor = (r) => {
+    if (r.status === 'failed') return { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', label: 'Failed' };
+    if (r.status !== 'done') return { color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.08)', label: r.status === 'scanning' ? 'Scanning…' : 'Queued' };
+    if (!isRowSaveable(r) || isRowAmber(r)) return { color: '#eab308', bg: 'rgba(234,179,8,0.12)', label: r.propertyId ? 'Check this' : 'Needs a property' };
+    return { color: '#22c55e', bg: 'rgba(34,197,94,0.12)', label: 'Looks good' };
+  };
+
+  const unassigned = [...rows].filter(r => !r.propertyId).sort((a, b) => rowPriority(a) - rowPriority(b));
+  const groupedByProperty = liveProperties
+    .map(p => ({ property: p, rows: [...rows].filter(r => r.propertyId === p.id).sort((a, b) => rowPriority(a) - rowPriority(b)) }))
+    .filter(g => g.rows.length > 0);
+
+  const doneCount = rows.filter(r => r.status === 'done' || r.status === 'failed').length;
+  const scanningLabel = rows.length > 0 && doneCount < rows.length ? `scanning ${doneCount} of ${rows.length}…` : null;
+  const eicrDangerRows = rows.filter(r => r.eicrCode === 'C1' || r.eicrCode === 'C2');
+  const totalSizeMb = rows.reduce((sum, r) => sum + r.fileSize, 0) / (1024 * 1024);
+  const saveableCount = rows.length - blockingCount;
+
+  const renderRow = (r) => {
+    const rc = rowColor(r);
+    const isProcessing = r.status === 'queued' || r.status === 'scanning';
+    return (
+      <div key={r.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px', opacity: isProcessing ? 0.7 : 1, transition: 'opacity 0.3s ease' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: rc.color, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, color: 'white', fontSize: '13px', fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.fileName}</p>
+            <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{(r.fileSize / (1024 * 1024)).toFixed(1)}MB</p>
+          </div>
+          <EicrBadge doc={{ eicr_code: r.eicrCode, eicr_summary: r.eicrSummary }} />
+          <span style={{ background: rc.bg, color: rc.color, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0, whiteSpace: 'nowrap' }}>{rc.label}</span>
+          {r.status === 'failed' && <button onClick={() => handleRetryRow(r.id)} style={{ padding: '5px 10px', background: 'rgba(43,124,211,0.15)', color: blue, border: 'none', borderRadius: '6px', fontSize: '11px', fontFamily: font, fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>Retry</button>}
+          <button onClick={() => handleDeleteRow(r.id)} style={{ padding: '5px 8px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '6px', fontSize: '11px', fontFamily: font, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+        </div>
+        {r.status === 'failed' && r.error && <p style={{ margin: '6px 0 0 18px', color: '#f87171', fontSize: '11px' }}>{r.error}</p>}
+        {r.saveError && <p style={{ margin: '6px 0 0 18px', color: '#f87171', fontSize: '11px' }}>Couldn't save: {r.saveError}</p>}
+        {r.status === 'done' && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.2fr 1fr 1.4fr', gap: '10px', marginTop: '10px' }}>
+            <div>
+              <select value={r.documentType} onChange={e => updateRow(r.id, { documentType: e.target.value, typeSource: 'user' })} style={miniInputStyle}>
+                {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              {r.documentType === 'Other' && (
+                <input type="text" placeholder="Enter document type…" value={r.customDocType} onChange={e => updateRow(r.id, { customDocType: e.target.value, typeSource: 'user' })} style={{ ...miniInputStyle, marginTop: '6px' }} />
+              )}
+            </div>
+            <div>
+              <input type="date" value={r.expiryDate} onChange={e => updateRow(r.id, { expiryDate: e.target.value, expirySource: 'user' })} style={miniInputStyle} />
+              {r.expirySource === 'derived' && <p style={{ margin: '4px 0 0', color: '#eab308', fontSize: '10px' }}>Calculated — not printed on the document</p>}
+            </div>
+            <div>
+              <SearchablePropertySelect properties={liveProperties} value={r.propertyId} onChange={(id) => updateRow(r.id, { propertyId: id, propertySource: 'user', propertyConfidence: 'high' })} placeholder="Choose property…" />
+              {!r.propertyId && r.propertyCandidates && r.propertyCandidates.length > 1 && (
+                <p style={{ margin: '4px 0 0', color: '#eab308', fontSize: '10px' }}>Postcode matches {r.propertyCandidates.length} properties — pick the right one.</p>
+              )}
+              {!r.propertyId && (!r.propertyCandidates || r.propertyCandidates.length === 0) && (
+                <p style={{ margin: '4px 0 0', color: '#eab308', fontSize: '10px' }}>Couldn't match a property automatically.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ padding: isMobile ? '20px 16px 90px' : '32px' }}>
+      <span onClick={() => setScreen('properties')} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Properties</span>
+      <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 6px' }}>📦 Bulk Upload</h1>
+      <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', fontSize: '13px' }}>Drop in everything you've got. Gas Safe, EICR, EPC, licences. We'll work out what's what.</p>
+
+      {liveProperties.length === 0 ? (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '40px 24px', textAlign: 'center' }}>
+          <p style={{ fontSize: '32px', margin: '0 0 12px' }}>🏠</p>
+          <p style={{ color: 'white', fontWeight: '700', fontSize: '15px', margin: '0 0 8px' }}>Add a property first</p>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: '0 0 20px' }}>Bulk upload matches each certificate to one of your properties, so add at least one before uploading.</p>
+          <button onClick={() => setScreen('properties')} style={{ background: blue, color: 'white', border: 'none', borderRadius: '8px', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: font }}>Go to Properties</button>
+        </div>
+      ) : (
+        <>
+          {rows.length < BULK_MAX_FILES && (
+            <label
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
+              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); getFilesFromDataTransfer(e.dataTransfer).then(handleFiles); }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${dragOver ? blue : 'rgba(43,124,211,0.45)'}`, borderRadius: '14px', padding: '40px 20px', cursor: 'pointer', textAlign: 'center', background: dragOver ? 'rgba(43,124,211,0.1)' : 'rgba(43,124,211,0.05)', marginBottom: '16px', transition: 'all 0.15s' }}
+            >
+              <span style={{ fontSize: '30px', marginBottom: '8px' }}>⬆️</span>
+              <span style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Drop your certificates here</span>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>or click to browse — PDF, JPG, PNG or HEIC, up to {BULK_MAX_FILES} files at once</span>
+              <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} style={{ display: 'none' }} />
+            </label>
+          )}
+
+          {dropNotice && (
+            <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+              <p style={{ margin: 0, color: '#eab308', fontSize: '12px', fontWeight: '600' }}>{dropNotice}</p>
+            </div>
+          )}
+
+          {rows.length > 0 && (
+            <>
+              <p style={{ margin: '0 0 14px', color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+                {rows.length} file{rows.length === 1 ? '' : 's'} · {totalSizeMb.toFixed(1)}MB{scanningLabel ? ` · ${scanningLabel}` : ''}
+              </p>
+
+              {eicrDangerRows.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  {eicrDangerRows.map(r => (
+                    <div key={r.id} style={{ marginBottom: '8px' }}>
+                      <p style={{ margin: '0 0 4px', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: '700' }}>⚠ {r.fileName}</p>
+                      <EicrAlert code={r.eicrCode} summary={r.eicrSummary} deadline={r.eicrDeadline} confidence={r.eicrConfidence} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {unassigned.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ color: '#eab308', fontSize: '13px', fontWeight: '800', margin: '0 0 10px' }}>📌 Assign these ({unassigned.length})</p>
+                  {unassigned.map(renderRow)}
+                </div>
+              )}
+
+              {groupedByProperty.map(g => (
+                <div key={g.property.id} style={{ marginBottom: '20px' }}>
+                  <p style={{ color: 'white', fontSize: '13px', fontWeight: '800', margin: '0 0 10px' }}>🏠 {g.property.address_line_1}{g.property.address_line_2 ? `, ${g.property.address_line_2}` : ''}</p>
+                  {g.rows.map(renderRow)}
+                </div>
+              ))}
+
+              <div style={{ position: 'sticky', bottom: 0, background: navy, paddingTop: '14px', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' }}>
+                <button onClick={handleSaveAll} disabled={blockingCount > 0 || saving} style={{ padding: '14px 28px', background: (blockingCount > 0 || saving) ? 'rgba(43,124,211,0.3)' : blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontFamily: font, fontWeight: '700', cursor: (blockingCount > 0 || saving) ? 'not-allowed' : 'pointer' }}>
+                  {saving ? 'Saving…' : `Save all${saveableCount > 0 ? ` (${saveableCount})` : ''}`}
+                </button>
+                {blockingCount > 0 && <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{blockingCount} file{blockingCount === 1 ? '' : 's'} still need{blockingCount === 1 ? 's' : ''} attention</p>}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
@@ -3166,7 +3670,8 @@ function App() {
 
   const handleGenerateShareLink = async () => {
     const token = crypto.randomUUID();
-    const { error } = await supabase.from('properties').update({ share_token: token }).eq('id', selectedProperty.id);
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from('properties').update({ share_token: token, share_expires_at: expiresAt }).eq('id', selectedProperty.id);
     if (error) { alert(error.message); return; }
     const link = `https://app.thelandlordmate.com?share=${token}`;
     setShareLink(link);
@@ -4938,6 +5443,7 @@ function App() {
             {shareLink && (
               <div style={{ background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '8px', marginBottom: '12px' }}>
                 <p style={{ margin: '0 0 8px', fontSize: '12px', color: 'rgba(255,255,255,0.6)', wordBreak: 'break-all' }}>{shareLink}</p>
+                <p style={{ margin: '0 0 8px', fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Expires in 90 days — generate a new link after that.</p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <a href={`mailto:?subject=${encodeURIComponent('Compliance documents for ' + selectedProperty.address_line_1)}&body=${encodeURIComponent(`Hi,\n\nHere's a link to view the compliance documents for ${selectedProperty.address_line_1}, no login needed:\n\n${shareLink}\n\nThanks`)}`} style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)', color: 'white', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>✉️ Email it</a>
                   <a href={`https://wa.me/?text=${encodeURIComponent(`Here's a link to view the compliance documents for ${selectedProperty.address_line_1}, no login needed: ${shareLink}`)}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)', color: 'white', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>💬 WhatsApp it</a>
@@ -5399,6 +5905,20 @@ function App() {
     );
   }
 
+  if (user && screen === 'bulk-upload') {
+    return (
+      <AppShell screen="bulk-upload" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
+        <BulkUploadScreen
+          user={user}
+          properties={properties}
+          setScreen={setScreen}
+          refreshData={() => loadPropertiesForUser(user.id)}
+          setPropertyActionMessage={setPropertyActionMessage}
+        />
+      </AppShell>
+    );
+  }
+
   if (user && screen === 'properties') {
     return (
       <AppShell screen="properties" setScreen={setScreen} user={user} handleSignOut={handleSignOut} properties={properties} allDocuments={allDocuments} landlordLogoUrl={landlordLogoUrl} setSelectedLetter={setSelectedLetter} setSelectedProperty={setSelectedProperty}>
@@ -5406,9 +5926,14 @@ function App() {
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>All Properties</h1>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', margin: 0 }}>Click a property to manage its compliance documents.</p>
-            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px', flexShrink: 0 }}>
-              <button onClick={() => setPropertyViewMode('tiles')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'tiles' ? blue : 'transparent', color: propertyViewMode === 'tiles' ? 'white' : 'rgba(255,255,255,0.5)' }}>🔳 Tiles</button>
-              <button onClick={() => setPropertyViewMode('list')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'list' ? blue : 'transparent', color: propertyViewMode === 'list' ? 'white' : 'rgba(255,255,255,0.5)' }}>☰ List</button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+              {properties.length > 0 && (
+                <button onClick={() => setScreen('bulk-upload')} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: blue, color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>📦 Bulk Upload</button>
+              )}
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '3px', flexShrink: 0 }}>
+                <button onClick={() => setPropertyViewMode('tiles')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'tiles' ? blue : 'transparent', color: propertyViewMode === 'tiles' ? 'white' : 'rgba(255,255,255,0.5)' }}>🔳 Tiles</button>
+                <button onClick={() => setPropertyViewMode('list')} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: '700', fontFamily: font, cursor: 'pointer', background: propertyViewMode === 'list' ? blue : 'transparent', color: propertyViewMode === 'list' ? 'white' : 'rgba(255,255,255,0.5)' }}>☰ List</button>
+              </div>
             </div>
           </div>
 
