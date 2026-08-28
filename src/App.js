@@ -1897,6 +1897,12 @@ function App() {
   const [agentDocuments, setAgentDocuments] = useState([]);
   const [sharedIdDocs, setSharedIdDocs] = useState([]);
   const [idDocsPanelFor, setIdDocsPanelFor] = useState(null);
+  const [packRequests, setPackRequests] = useState([]);
+  const [requestPickerFor, setRequestPickerFor] = useState(null);
+  const [requestPickerTypes, setRequestPickerTypes] = useState([]);
+  const [requestPickerNote, setRequestPickerNote] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const [packRequestsForMe, setPackRequestsForMe] = useState([]);
   const [agentFilter, setAgentFilter] = useState('all');
   const [agentGroupByLandlord, setAgentGroupByLandlord] = useState(false);
   const [agentPropertiesPage, setAgentPropertiesPage] = useState(1);
@@ -2188,6 +2194,13 @@ function App() {
       .select('landlord_id, granted_at, documents(id, document_type, file_path, expiry_date)')
       .is('revoked_at', null);
     if (shares) setSharedIdDocs(shares);
+
+    const { data: sentRequests } = await supabase
+      .from('document_pack_requests')
+      .select('id, landlord_id, requested_types, note, created_at')
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false });
+    if (sentRequests) setPackRequests(sentRequests);
 
     // Match landlords to properties — checked via a secure server-side function,
     // since RLS correctly blocks the agent's own session from reading other
@@ -3201,6 +3214,36 @@ function App() {
     if (ldocs) setLandlordDocs(ldocs);
     loadLinkedAgents();
     loadDocShares();
+    loadPackRequestsForMe();
+  };
+
+  const loadPackRequestsForMe = async () => {
+    const { data } = await supabase
+      .from('document_pack_requests')
+      .select('id, agent_id, requested_types, note, created_at')
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false });
+    if (!data || data.length === 0) { setPackRequestsForMe([]); return; }
+    // agent_id -> name isn't readable via the landlord's own RLS, so resolve
+    // display names the same way My Documents already resolves linked agents.
+    const { data: { session } } = await supabase.auth.getSession();
+    let agentsById = {};
+    if (session) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/get-landlord-agents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session.access_token}` },
+        });
+        const agentsData = await res.json();
+        agentsById = Object.fromEntries((agentsData.agents || []).map(a => [a.id, a]));
+      } catch (e) { /* falls back to showing no name below */ }
+    }
+    setPackRequestsForMe(data.map(r => ({ ...r, agent: agentsById[r.agent_id] || null })));
+  };
+
+  const handleDismissPackRequest = async (requestId) => {
+    const { error } = await supabase.from('document_pack_requests').update({ dismissed_at: new Date().toISOString() }).eq('id', requestId);
+    if (!error) setPackRequestsForMe(prev => prev.filter(r => r.id !== requestId));
   };
 
   // Which agent(s) this landlord is linked to, for the personal-document sharing
@@ -4615,8 +4658,34 @@ function App() {
           ? Math.round(theirProperties.reduce((sum, p) => sum + getHealthScoreD(p.id), 0) / theirProperties.length)
           : null;
         const theirIdDocs = sharedIdDocs.filter(s => s.landlord_id === l.id && s.documents);
-        return { ...l, propertyCount: theirProperties.length, firstProperty: theirProperties[0], avgScore, theirIdDocs };
+        const theirActiveRequest = packRequests.find(r => r.landlord_id === l.id) || null;
+        const fulfilledCount = theirActiveRequest ? theirActiveRequest.requested_types.filter(t => theirIdDocs.some(s => s.documents.document_type === t)).length : 0;
+        return { ...l, propertyCount: theirProperties.length, firstProperty: theirProperties[0], avgScore, theirIdDocs, theirActiveRequest, fulfilledCount };
       }).sort((a, b) => (a.full_name || a.email).localeCompare(b.full_name || b.email));
+
+      const handleSendPackRequest = async (landlordId) => {
+        if (requestPickerTypes.length === 0) { alert('Select at least one document type to request.'); return; }
+        setSendingRequest(true);
+        try {
+          const { error } = await supabase.from('document_pack_requests').insert([{ agent_id: user.id, landlord_id: landlordId, requested_types: requestPickerTypes, note: requestPickerNote.trim() || null }]);
+          if (error) throw error;
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            fetch(`${SUPABASE_URL}/functions/v1/send-pack-request-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session.access_token}` },
+              body: JSON.stringify({ landlord_id: landlordId, requested_types: requestPickerTypes, note: requestPickerNote.trim() || null }),
+            }).catch(() => {});
+          }
+          await loadAgentData(userRecord);
+          setRequestPickerFor(null);
+          setRequestPickerTypes([]);
+          setRequestPickerNote('');
+        } catch (e) {
+          alert("Couldn't send this request — please try again.");
+        }
+        setSendingRequest(false);
+      };
 
       return (
         <div style={{ minHeight: '100vh', background: navy, fontFamily: font }}>
@@ -4691,12 +4760,19 @@ function App() {
                     </div>
                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{l.propertyCount} {l.propertyCount === 1 ? 'property' : 'properties'}</p>
                     <p style={{ margin: 0, color: l.avgScore === null ? 'rgba(255,255,255,0.3)' : getHealthColor(l.avgScore), fontSize: '13px', fontWeight: '700' }}>{l.avgScore === null ? '—' : `${l.avgScore}/100`}</p>
-                    <p
-                      onClick={() => l.theirIdDocs.length > 0 && setIdDocsPanelFor(idDocsPanelFor === l.id ? null : l.id)}
-                      style={{ margin: 0, color: l.theirIdDocs.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '700', cursor: l.theirIdDocs.length > 0 ? 'pointer' : 'default' }}
-                    >
-                      {l.theirIdDocs.length > 0 ? `${l.theirIdDocs.length} shared →` : 'None shared'}
-                    </p>
+                    <div>
+                      <p
+                        onClick={() => l.theirIdDocs.length > 0 && setIdDocsPanelFor(idDocsPanelFor === l.id ? null : l.id)}
+                        style={{ margin: 0, color: l.theirIdDocs.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '700', cursor: l.theirIdDocs.length > 0 ? 'pointer' : 'default' }}
+                      >
+                        {l.theirIdDocs.length > 0 ? `${l.theirIdDocs.length} shared →` : 'None shared'}
+                      </p>
+                      {l.theirActiveRequest ? (
+                        <p style={{ margin: '3px 0 0', color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Requested {new Date(l.theirActiveRequest.created_at).toLocaleDateString('en-GB')}: {l.fulfilledCount}/{l.theirActiveRequest.requested_types.length}</p>
+                      ) : (
+                        <p onClick={() => { setRequestPickerFor(requestPickerFor === l.id ? null : l.id); setRequestPickerTypes([]); setRequestPickerNote(''); }} style={{ margin: '3px 0 0', color: blue, fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>📋 Request pack</p>
+                      )}
+                    </div>
                     <p onClick={() => { setAgentSearch(l.full_name || l.email); setAgentPropertiesPage(1); setAgentScreen('properties'); }} style={{ margin: 0, color: l.propertyCount > 0 ? blue : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: l.propertyCount > 0 ? 'pointer' : 'default' }}>{l.propertyCount > 0 ? `View all ${l.propertyCount} →` : '—'}</p>
                   </div>
                   {idDocsPanelFor === l.id && (
@@ -4710,6 +4786,31 @@ function App() {
                               {s.documents.file_path && <ViewDocButton doc={s.documents} resolveUrl={signDocumentUrl} />}
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {requestPickerFor === l.id && (
+                    <div style={{ padding: '4px 20px 18px', borderBottom: i < landlordsList.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                      <div style={{ background: 'rgba(43,124,211,0.06)', border: '1px solid rgba(43,124,211,0.2)', borderRadius: '10px', padding: '14px 16px' }}>
+                        <p style={{ margin: '0 0 10px', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>REQUEST FROM {(l.full_name || l.email).toUpperCase()}</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                          {LANDLORD_DOC_TYPES.filter(t => t !== 'Other').map(t => (
+                            <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={requestPickerTypes.includes(t)}
+                                onChange={() => setRequestPickerTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                                style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+                              />
+                              <span style={{ color: 'white', fontSize: '13px' }}>{t}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <input type="text" placeholder="Optional note (e.g. why you need these)" value={requestPickerNote} onChange={e => setRequestPickerNote(e.target.value)} style={{ width: '100%', padding: '9px 12px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '13px', fontFamily: font, background: 'rgba(255,255,255,0.06)', color: 'white', boxSizing: 'border-box' }} />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => handleSendPackRequest(l.id)} disabled={sendingRequest} style={{ padding: '8px 18px', background: blue, color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '700', cursor: sendingRequest ? 'default' : 'pointer', opacity: sendingRequest ? 0.7 : 1 }}>{sendingRequest ? 'Sending…' : 'Send request'}</button>
+                          <button onClick={() => setRequestPickerFor(null)} style={{ padding: '8px 18px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: 'none', borderRadius: '8px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                         </div>
                       </div>
                     </div>
@@ -6307,6 +6408,32 @@ function App() {
         <div style={{ padding: isMobile ? '20px 16px 80px' : '32px' }}>
           <h1 style={{ color: 'white', fontWeight: '800', fontSize: '20px', marginBottom: '6px' }}>🪪 My Documents</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>Your personal landlord documents — stored once, available always.</p>
+
+          {packRequestsForMe.map(req => {
+            const items = req.requested_types.map(t => {
+              const matchingDoc = landlordDocs.find(d => d.document_type === t);
+              const fulfilled = !!(matchingDoc && docShares[matchingDoc.id]?.has(req.agent_id));
+              return { type: t, fulfilled };
+            });
+            return (
+              <div key={req.id} style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '8px' }}>
+                  <div>
+                    <p style={{ margin: '0 0 4px', color: 'white', fontWeight: '700', fontSize: '14px' }}>📋 {req.agent?.agency_name || req.agent?.email || 'Your agent'} is requesting:</p>
+                    {req.note && <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontStyle: 'italic' }}>"{req.note}"</p>}
+                  </div>
+                  <button onClick={() => handleDismissPackRequest(req.id)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>Dismiss ✕</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {items.map(item => (
+                    <p key={item.type} style={{ margin: 0, fontSize: '13px', color: item.fulfilled ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
+                      {item.fulfilled ? '✓' : '○'} {item.type}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
 
           {landlordDocs.length === 0 && !showLandlordUpload && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
