@@ -1813,6 +1813,10 @@ function App() {
   const [editPropertyBedrooms, setEditPropertyBedrooms] = useState('');
   const [editPropertyBathrooms, setEditPropertyBathrooms] = useState('');
   const [landlordDocs, setLandlordDocs] = useState([]);
+  const [linkedAgents, setLinkedAgents] = useState([]);
+  const [docShares, setDocShares] = useState({});
+  const [shareMenuOpenFor, setShareMenuOpenFor] = useState(null);
+  const [sharingBusy, setSharingBusy] = useState(false);
   const [showLandlordUpload, setShowLandlordUpload] = useState(false);
   const [landlordDocType, setLandlordDocType] = useState(LANDLORD_DOC_TYPES[0]);
   const [landlordExpiryDate, setLandlordExpiryDate] = useState('');
@@ -1891,6 +1895,8 @@ function App() {
   const [agentProperties, setAgentProperties] = useState([]);
   const [agentOnboardSizeAnswer, setAgentOnboardSizeAnswer] = useState(null);
   const [agentDocuments, setAgentDocuments] = useState([]);
+  const [sharedIdDocs, setSharedIdDocs] = useState([]);
+  const [idDocsPanelFor, setIdDocsPanelFor] = useState(null);
   const [agentFilter, setAgentFilter] = useState('all');
   const [agentGroupByLandlord, setAgentGroupByLandlord] = useState(false);
   const [agentPropertiesPage, setAgentPropertiesPage] = useState(1);
@@ -2173,6 +2179,15 @@ function App() {
       }
       setAgentDocuments(allDocs);
     }
+
+    // Personal ID documents a landlord has explicitly toggled on for this agent —
+    // RLS already scopes both sides (document_agent_access.agent_id = auth.uid(),
+    // and the matching documents SELECT policy), so no extra filtering needed here.
+    const { data: shares } = await supabase
+      .from('document_agent_access')
+      .select('landlord_id, granted_at, documents(id, document_type, file_path, expiry_date)')
+      .is('revoked_at', null);
+    if (shares) setSharedIdDocs(shares);
 
     // Match landlords to properties — checked via a secure server-side function,
     // since RLS correctly blocks the agent's own session from reading other
@@ -3184,6 +3199,59 @@ function App() {
     }
     const { data: ldocs } = await supabase.from('documents').select('*').eq('user_id', userId).is('property_id', null);
     if (ldocs) setLandlordDocs(ldocs);
+    loadLinkedAgents();
+    loadDocShares();
+  };
+
+  // Which agent(s) this landlord is linked to, for the personal-document sharing
+  // toggles on My Documents. Resolved server-side (get-landlord-agents) since a
+  // landlord's own RLS can't read another user's name/email directly.
+  const loadLinkedAgents = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/get-landlord-agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.agents) setLinkedAgents(data.agents);
+    } catch (e) {
+      // Sharing toggles just show as unavailable — not fatal to the rest of the page.
+    }
+  };
+
+  // Which of this landlord's personal documents are currently shared with which
+  // agent. { [document_id]: Set(agent_id) }, active grants only (revoked_at null).
+  const loadDocShares = async () => {
+    const { data, error } = await supabase.from('document_agent_access').select('document_id, agent_id').is('revoked_at', null);
+    if (error) return; // table may not exist yet on environments mid-rollout
+    const map = {};
+    for (const row of data || []) {
+      if (!map[row.document_id]) map[row.document_id] = new Set();
+      map[row.document_id].add(row.agent_id);
+    }
+    setDocShares(map);
+  };
+
+  const toggleDocShare = async (doc, agentId, currentlyShared) => {
+    setSharingBusy(true);
+    try {
+      if (currentlyShared) {
+        const { error } = await supabase.from('document_agent_access').update({ revoked_at: new Date().toISOString() }).eq('document_id', doc.id).eq('agent_id', agentId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('document_agent_access').upsert(
+          { document_id: doc.id, agent_id: agentId, landlord_id: user.id, revoked_at: null, granted_at: new Date().toISOString() },
+          { onConflict: 'document_id,agent_id' }
+        );
+        if (error) throw error;
+      }
+      await loadDocShares();
+    } catch (e) {
+      alert("Couldn't update sharing for this document — please try again.");
+    }
+    setSharingBusy(false);
   };
 
   const loadAllDocuments = async (props) => {
@@ -4546,7 +4614,8 @@ function App() {
         const avgScore = theirProperties.length > 0
           ? Math.round(theirProperties.reduce((sum, p) => sum + getHealthScoreD(p.id), 0) / theirProperties.length)
           : null;
-        return { ...l, propertyCount: theirProperties.length, firstProperty: theirProperties[0], avgScore };
+        const theirIdDocs = sharedIdDocs.filter(s => s.landlord_id === l.id && s.documents);
+        return { ...l, propertyCount: theirProperties.length, firstProperty: theirProperties[0], avgScore, theirIdDocs };
       }).sort((a, b) => (a.full_name || a.email).localeCompare(b.full_name || b.email));
 
       return (
@@ -4578,14 +4647,16 @@ function App() {
               </div>
             ) : (
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0', padding: '12px 20px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '0', padding: '12px 20px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>LANDLORD</span>
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>PROPERTIES</span>
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>AVG SCORE</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>🪪 ID DOCS</span>
                   <span></span>
                 </div>
                 {landlordsList.map((l, i) => (
-                  <div key={l.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0', padding: '14px 20px', borderBottom: i < landlordsList.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
+                  <div key={l.id}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '0', padding: '14px 20px', borderBottom: (i < landlordsList.length - 1 && idDocsPanelFor !== l.id) ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center' }}>
                     <div>
                       {editingLandlordId === l.id ? (
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -4620,7 +4691,29 @@ function App() {
                     </div>
                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{l.propertyCount} {l.propertyCount === 1 ? 'property' : 'properties'}</p>
                     <p style={{ margin: 0, color: l.avgScore === null ? 'rgba(255,255,255,0.3)' : getHealthColor(l.avgScore), fontSize: '13px', fontWeight: '700' }}>{l.avgScore === null ? '—' : `${l.avgScore}/100`}</p>
+                    <p
+                      onClick={() => l.theirIdDocs.length > 0 && setIdDocsPanelFor(idDocsPanelFor === l.id ? null : l.id)}
+                      style={{ margin: 0, color: l.theirIdDocs.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '700', cursor: l.theirIdDocs.length > 0 ? 'pointer' : 'default' }}
+                    >
+                      {l.theirIdDocs.length > 0 ? `${l.theirIdDocs.length} shared →` : 'None shared'}
+                    </p>
                     <p onClick={() => { setAgentSearch(l.full_name || l.email); setAgentPropertiesPage(1); setAgentScreen('properties'); }} style={{ margin: 0, color: l.propertyCount > 0 ? blue : 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: l.propertyCount > 0 ? 'pointer' : 'default' }}>{l.propertyCount > 0 ? `View all ${l.propertyCount} →` : '—'}</p>
+                  </div>
+                  {idDocsPanelFor === l.id && (
+                    <div style={{ padding: '4px 20px 18px', borderBottom: i < landlordsList.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                      <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '10px', padding: '12px 16px' }}>
+                        <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>SHARED BY {(l.full_name || l.email).toUpperCase()}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {l.theirIdDocs.map(s => (
+                            <div key={s.documents.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                              <span style={{ color: 'white', fontSize: '13px' }}>{s.documents.document_type}</span>
+                              {s.documents.file_path && <ViewDocButton doc={s.documents} resolveUrl={signDocumentUrl} />}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 ))}
               </div>
@@ -6239,10 +6332,39 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     {status && !isMobile && <span style={{ background: status.bg, color: status.color, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>{status.label}</span>}
                     {doc.file_path && <ViewDocButton doc={doc} resolveUrl={signDocumentUrl} />}
+                    <button
+                      onClick={() => setShareMenuOpenFor(shareMenuOpenFor === doc.id ? null : doc.id)}
+                      title={linkedAgents.length === 0 ? 'Link an agent on a property first' : 'Share with an agent'}
+                      style={{ padding: '5px 10px', background: (docShares[doc.id]?.size > 0) ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.08)', color: (docShares[doc.id]?.size > 0) ? '#4ade80' : 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      🔗 {docShares[doc.id]?.size > 0 ? `Shared (${docShares[doc.id].size})` : 'Share'}
+                    </button>
                     <button onClick={() => handleEditLandlordDoc(doc)} style={{ padding: '5px 10px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                     <button onClick={() => handleDeleteLandlordDoc(doc.id)} style={{ padding: '5px 10px', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: font, fontWeight: '600', cursor: 'pointer' }}>Delete</button>
                   </div>
                 </div>
+                {shareMenuOpenFor === doc.id && (
+                  <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {linkedAgents.length === 0 ? (
+                      <p style={{ margin: 0, color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>No agents linked yet — add an agent's email on one of your properties first, then come back here to share this with them.</p>
+                    ) : (
+                      <>
+                        <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>SHARE WITH</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {linkedAgents.map(agent => {
+                            const shared = docShares[doc.id]?.has(agent.id) || false;
+                            return (
+                              <label key={agent.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: sharingBusy ? 'default' : 'pointer' }}>
+                                <input type="checkbox" checked={shared} disabled={sharingBusy} onChange={() => toggleDocShare(doc, agent.id, shared)} style={{ width: '15px', height: '15px', cursor: sharingBusy ? 'default' : 'pointer' }} />
+                                <span style={{ color: 'white', fontSize: '13px' }}>{agent.agency_name || agent.email}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
