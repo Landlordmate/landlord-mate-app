@@ -1608,7 +1608,8 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
     <div style={{ padding: isMobile ? '20px 16px 90px' : '32px' }}>
       <span onClick={() => setScreen('properties')} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Properties</span>
       <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 6px' }}>📦 Bulk Upload</h1>
-      <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', fontSize: '13px' }}>Drop in everything you've got. Gas Safe, EICR, EPC, licences. We'll work out what's what.</p>
+      <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 4px', fontSize: '13px', lineHeight: '1.6', maxWidth: '640px' }}>Upload all your compliance documents in one go — Gas Safety Certificates, EICRs, EPCs, licences, tenancy paperwork and more. We'll read each one, work out what it is, when it expires and which property it belongs to.</p>
+      <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', fontSize: '13px', lineHeight: '1.6', maxWidth: '640px' }}>Drop in everything you've got and we'll work out what's what — nothing is saved until you've checked it over below.</p>
 
       {liveProperties.length === 0 ? (
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '40px 24px', textAlign: 'center' }}>
