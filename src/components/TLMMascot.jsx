@@ -206,6 +206,7 @@ export default function TLMMascot({
   animate = 'none',
   className = '',
   title,
+  bg = 'none',
 }) {
   // Head-only crop for small avatars (Ask Mate, comment threads, favicons).
   const isHead = pose === 'head';
@@ -218,35 +219,76 @@ export default function TLMMascot({
     .filter(Boolean)
     .join(' ');
 
+  const svgHeight = isHead ? size : size * 1.18;
+
+  const svg = (
+    <svg
+      viewBox={viewBox}
+      width={size}
+      height={svgHeight}
+      className={wrapClass}
+      role="img"
+      aria-label={label}
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      <title>{label}</title>
+
+      {!isHead && <Legs />}
+
+      {!isHead && pose === 'thumbsup' && <ArmThumbsUp animate={animate} />}
+      {!isHead && pose === 'wave' && <ArmWave animate={animate} />}
+      {!isHead && pose === 'certificates' && <ArmHolding />}
+      {!isHead && pose !== 'wave' && <ArmHip />}
+
+      <Chimney />
+      <Body />
+      <Roof />
+      {!isHead && <Tick />}
+      <Face />
+
+      {pose === 'certificates' && <Certificates />}
+    </svg>
+  );
+
+  // The mascot's body/arms/legs are navy - invisible against a dark navy app
+  // background (only the blue roof/tick and white face have contrast there).
+  // bg="light" drops him on a light backdrop chip so the whole character
+  // reads. Use it anywhere he sits on a dark background; skip it on already-
+  // light surfaces (the white pre-login cards, print, email) where the
+  // plain artwork already contrasts fine.
+  if (bg === 'light') {
+    const isCircle = isHead;
+    // Padding scales with size so small avatars and large illustrations both
+    // get a proportionate breathing margin around the artwork.
+    const pad = Math.round(size * (isCircle ? 0.22 : 0.14));
+    return (
+      <>
+        <style>{styles}</style>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: size + pad * 2,
+            height: svgHeight + pad * 2,
+            padding: pad,
+            boxSizing: 'content-box',
+            background: '#FFFFFF',
+            borderRadius: isCircle ? '50%' : Math.round(size * 0.16),
+            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+            flexShrink: 0,
+          }}
+        >
+          {svg}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style>{styles}</style>
-      <svg
-        viewBox={viewBox}
-        width={size}
-        height={isHead ? size : size * 1.18}
-        className={wrapClass}
-        role="img"
-        aria-label={label}
-        style={{ display: 'block', overflow: 'visible' }}
-      >
-        <title>{label}</title>
-
-        {!isHead && <Legs />}
-
-        {!isHead && pose === 'thumbsup' && <ArmThumbsUp animate={animate} />}
-        {!isHead && pose === 'wave' && <ArmWave animate={animate} />}
-        {!isHead && pose === 'certificates' && <ArmHolding />}
-        {!isHead && pose !== 'wave' && <ArmHip />}
-
-        <Chimney />
-        <Body />
-        <Roof />
-        {!isHead && <Tick />}
-        <Face />
-
-        {pose === 'certificates' && <Certificates />}
-      </svg>
+      {svg}
     </>
   );
 }

@@ -406,7 +406,7 @@ function CompliancePieChart({ documents, onSegmentClick }) {
       <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', margin: '0 0 16px' }}>Compliance Overview</p>
       {good === total && total > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px' }}>
-          <TLMMascot pose="thumbsup" size={36} animate="pop" />
+          <TLMMascot pose="thumbsup" size={36} animate="pop" bg="light" />
           <p style={{ margin: 0, color: '#4ade80', fontSize: '13px', fontWeight: '700' }}>100% compliant — every document is in order.</p>
         </div>
       )}
@@ -551,7 +551,7 @@ function OnboardingWizard({ onComplete, onAddProperty, user }) {
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', textAlign: 'center', marginBottom: '16px' }}>
           {step === 3 ? (
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-              <TLMMascot pose="thumbsup" size={100} animate="pop" />
+              <TLMMascot pose="thumbsup" size={100} animate="pop" bg="light" />
             </div>
           ) : (
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>{current.icon}</div>
@@ -1008,9 +1008,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
       if (id === 'properties') setSelectedProperty(null);
     }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
       {id === 'askmate' ? (
-        <span style={{ display: 'inline-flex', width: '48px', height: '48px', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <TLMMascot pose="head" size={40} />
-        </span>
+        <TLMMascot pose="head" size={32} bg="light" />
       ) : (
         <span style={{ fontSize: '16px' }}>{icon}</span>
       )}
@@ -1133,7 +1131,7 @@ function AskAnythingWidget({ properties, forceWales }) {
       <div style={{ textAlign: 'center', marginBottom: '32px', paddingTop: '8px' }}>
         <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', margin: '0 0 10px' }}>
-          <TLMMascot pose="head" size={48} animate={loading ? 'bob' : 'none'} />
+          <TLMMascot pose="head" size={40} animate={loading ? 'bob' : 'none'} bg="light" />
           <h2 style={{ margin: 0, color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h2>
         </div>
         <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance</p>
@@ -1167,7 +1165,7 @@ function AskAnythingWidget({ properties, forceWales }) {
 
       {loading && (
         <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <TLMMascot pose="head" size={32} animate="bob" />
+          <TLMMascot pose="head" size={32} animate="bob" bg="light" />
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>{loadingMsg}</p>
         </div>
       )}
@@ -1175,7 +1173,7 @@ function AskAnythingWidget({ properties, forceWales }) {
       {answer && !loading && (
         <div style={{ marginTop: '16px', background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px' }}>
-            <TLMMascot pose="head" size={28} />
+            <TLMMascot pose="head" size={28} bg="light" />
             <p style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Answer</p>
           </div>
           <p style={{ margin: 0, color: 'white', fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{answer}</p>
@@ -1369,7 +1367,7 @@ function Dashboard({ properties, documents, setScreen, setSelectedProperty, hand
       {documents.length === 0 && properties.length === 0 && (
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '40px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-            <TLMMascot pose="thumbsup" size={180} animate="bob" />
+            <TLMMascot pose="thumbsup" size={180} animate="bob" bg="light" />
           </div>
           <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>Add your first property to get started</p>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 20px' }}>Add a property and upload your compliance certificates</p>
@@ -1654,7 +1652,7 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
               onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); getFilesFromDataTransfer(e.dataTransfer).then(handleFiles); }}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${dragOver ? blue : 'rgba(43,124,211,0.45)'}`, borderRadius: '14px', padding: '40px 20px', cursor: 'pointer', textAlign: 'center', background: dragOver ? 'rgba(43,124,211,0.1)' : 'rgba(43,124,211,0.05)', marginBottom: '16px', transition: 'all 0.15s' }}
             >
-              <TLMMascot pose="certificates" size={110} animate="bob" />
+              <TLMMascot pose="certificates" size={110} animate="bob" bg="light" />
               <span style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginTop: '10px', marginBottom: '4px' }}>Drop your certificates here</span>
               <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>or click to browse — PDF, JPG, PNG or HEIC, up to {BULK_MAX_FILES} files at once</span>
               <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,image/*" onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} style={{ display: 'none' }} />
@@ -6083,7 +6081,7 @@ function App() {
             )}
             {aiHistory.map((m, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                {m.role !== 'user' && <TLMMascot pose="head" size={28} />}
+                {m.role !== 'user' && <TLMMascot pose="head" size={28} bg="light" />}
                 <div style={{
                   maxWidth: '75%', padding: '10px 16px', borderRadius: '16px', fontSize: '13px', lineHeight: '1.6', fontFamily: font,
                   background: m.role === 'user' ? blue : 'rgba(255,255,255,0.07)',
@@ -6098,7 +6096,7 @@ function App() {
             ))}
             {aiLoading && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-start' }}>
-                <TLMMascot pose="head" size={28} animate="bob" />
+                <TLMMascot pose="head" size={28} animate="bob" bg="light" />
                 <div style={{ padding: '10px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font }}>
                   Thinking...
                 </div>
@@ -6214,7 +6212,7 @@ function App() {
 
           {propertyActionMessage && (
             <div key={propertyActionMessage} style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <TLMMascot pose="thumbsup" size={36} animate="pop" />
+              <TLMMascot pose="thumbsup" size={36} animate="pop" bg="light" />
               <p style={{ margin: 0, color: '#4ade80', fontSize: '13px', fontWeight: '600', lineHeight: '1.5', flex: 1 }}>{propertyActionMessage}</p>
               <button onClick={() => setPropertyActionMessage(null)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>✕</button>
             </div>
@@ -6223,7 +6221,7 @@ function App() {
           {properties.length === 0 && !showAdd && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-                <TLMMascot pose="thumbsup" size={180} />
+                <TLMMascot pose="thumbsup" size={180} bg="light" />
               </div>
               <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>No properties yet</p>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Add your first rental property to get started</p>
@@ -6470,7 +6468,7 @@ function App() {
           {landlordDocs.length === 0 && !showLandlordUpload && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '40px 24px', borderRadius: '12px', textAlign: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-                <TLMMascot pose="certificates" size={180} animate="bob" />
+                <TLMMascot pose="certificates" size={180} animate="bob" bg="light" />
               </div>
               <p style={{ color: 'white', fontWeight: '700', fontSize: '16px', margin: '0 0 8px' }}>Drop in everything you've got</p>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>Gas Safe, EICR, EPC, licences. We'll work out what's what.</p>
