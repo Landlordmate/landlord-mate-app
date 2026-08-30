@@ -10,7 +10,11 @@ import React from 'react';
  *   <TLMMascot pose="head" size={40} />            // small avatar, for Ask Mate
  *
  * Poses:  thumbsup | certificates | wave | head
- * Animate: none (default) | bob | wave | thumb | pop
+ * Animate: none (default) | bob | wave | thumb | pop | greet
+ *
+ * greet is the onboarding entrance: he rises into frame, settles, then
+ * waves once and rests. Use it with pose="wave". Remount the component
+ * (a changing key) to replay it.
  *
  * Colours come from NAVY / BLUE below. If the brand hexes differ, change them
  * in this one place and every instance updates.
@@ -42,13 +46,34 @@ const styles = `
   60%  { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* Entrance for the greeting: he rises into frame and settles, rather than
+   just fading in. Paired with tlm-wave-once so the wave lands after he
+   has arrived. */
+@keyframes tlm-rise {
+  0%   { transform: translateY(40px) scale(0.86); opacity: 0; }
+  55%  { transform: translateY(-6px) scale(1.03); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+/* A single deliberate wave that finishes and rests. The looping tlm-wave is
+   for ambient use; a greeting that never stops waving is maddening. */
+@keyframes tlm-wave-once {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-18deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-16deg); }
+  60%  { transform: rotate(8deg); }
+  75%  { transform: rotate(-10deg); }
+  100% { transform: rotate(0deg); }
+}
 .tlm-bob   { animation: tlm-bob 3.2s ease-in-out infinite; }
 .tlm-pop   { animation: tlm-pop 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.tlm-rise  { animation: tlm-rise 0.62s cubic-bezier(0.22, 1.15, 0.36, 1) both; }
 .tlm-arm-wave  { animation: tlm-wave 3s ease-in-out infinite; transform-origin: 200px 590px; }
+.tlm-arm-wave-once { animation: tlm-wave-once 1.5s ease-in-out 0.45s both; transform-origin: 200px 590px; }
 .tlm-arm-thumb { animation: tlm-thumb 2.4s ease-in-out infinite; transform-origin: 200px 570px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tlm-bob, .tlm-pop, .tlm-arm-wave, .tlm-arm-thumb { animation: none !important; }
+  .tlm-bob, .tlm-pop, .tlm-rise, .tlm-arm-wave, .tlm-arm-wave-once, .tlm-arm-thumb { animation: none !important; }
 }
 `;
 
@@ -141,7 +166,7 @@ const ArmThumbsUp = ({ animate }) => (
 );
 
 const ArmWave = ({ animate }) => (
-  <g className={animate === 'wave' ? 'tlm-arm-wave' : undefined}>
+  <g className={animate === 'wave' ? 'tlm-arm-wave' : animate === 'greet' ? 'tlm-arm-wave-once' : undefined}>
     <path
       d="M 195 570 Q 140 552 124 500"
       stroke={NAVY}
@@ -215,18 +240,26 @@ export default function TLMMascot({
   const label =
     title ?? (isHead ? 'The Landlord Mate' : 'The Landlord Mate mascot');
 
-  const wrapClass = [animate === 'bob' ? 'tlm-bob' : '', animate === 'pop' ? 'tlm-pop' : '', className]
+  const isChip = bg === 'light';
+  const svgHeight = isHead ? size : size * 1.18;
+
+  // Whole-body animation (bob, pop, rise) has to sit on the OUTERMOST element.
+  // With bg="light" that's the backdrop chip - putting it on the inner svg
+  // would animate him inside a chip that stayed still.
+  const motionClass = [
+    animate === 'bob' ? 'tlm-bob' : '',
+    animate === 'pop' ? 'tlm-pop' : '',
+    animate === 'greet' ? 'tlm-rise' : '',
+  ]
     .filter(Boolean)
     .join(' ');
-
-  const svgHeight = isHead ? size : size * 1.18;
 
   const svg = (
     <svg
       viewBox={viewBox}
       width={size}
       height={svgHeight}
-      className={wrapClass}
+      className={isChip ? undefined : [motionClass, className].filter(Boolean).join(' ')}
       role="img"
       aria-label={label}
       style={{ display: 'block', overflow: 'visible' }}
@@ -256,7 +289,7 @@ export default function TLMMascot({
   // reads. Use it anywhere he sits on a dark background; skip it on already-
   // light surfaces (the white pre-login cards, print, email) where the
   // plain artwork already contrasts fine.
-  if (bg === 'light') {
+  if (isChip) {
     const isCircle = isHead;
     // Padding scales with size so small avatars and large illustrations both
     // get a proportionate breathing margin around the artwork.
@@ -265,6 +298,7 @@ export default function TLMMascot({
       <>
         <style>{styles}</style>
         <div
+          className={[motionClass, className].filter(Boolean).join(' ') || undefined}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

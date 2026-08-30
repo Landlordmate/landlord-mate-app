@@ -450,6 +450,22 @@ function CompliancePieChart({ documents, onSegmentClick }) {
   );
 }
 
+// Mate's speech bubble. White so it reads as his voice rather than more UI
+// chrome, with a tail pointing back at him. pointer="up" for stacked mobile
+// layouts, "left" when he sits beside it.
+function MateBubble({ children, pointer = 'left', maxWidth = 320 }) {
+  const isUp = pointer === 'up';
+  const tail = isUp
+    ? { top: '-9px', left: '50%', marginLeft: '-9px', borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderBottom: '9px solid #FFFFFF' }
+    : { left: '-9px', top: '24px', borderTop: '9px solid transparent', borderBottom: '9px solid transparent', borderRight: '9px solid #FFFFFF' };
+  return (
+    <div style={{ position: 'relative', background: '#FFFFFF', color: '#16294A', borderRadius: '14px', padding: '14px 18px', maxWidth: `${maxWidth}px`, fontSize: '14px', lineHeight: '1.6', textAlign: 'left', boxShadow: '0 2px 12px rgba(0,0,0,0.22)', fontFamily: font }}>
+      <span style={{ position: 'absolute', width: 0, height: 0, ...tail }} />
+      {children}
+    </div>
+  );
+}
+
 function OnboardingWizard({ onComplete, onAddProperty, user }) {
   const [step, setStep] = useState(0);
   const [propertyCount, setPropertyCount] = useState('');
@@ -485,19 +501,44 @@ function OnboardingWizard({ onComplete, onAddProperty, user }) {
     setStep(1);
   };
 
+  // Copy is written in Mate's voice: plain, warm, never alarmist. He appears
+  // in a pose that matches the step rather than a generic emoji.
   const steps = [
-    { icon: '🏠', title: 'Add your first property', desc: "Start by adding a rental property. We'll look up the address from your postcode.", action: 'Add Property →', isAdd: true, hint: null },
-    { icon: '📄', title: 'Upload a compliance document', desc: "Upload your Gas Safety Certificate, EICR, EPC or any other certificate. Set the expiry date and we'll remind you automatically.", hint: 'We send reminders at 90, 60, 30, 14 and 7 days before expiry.', action: 'Got it →', isAdd: false },
-    { icon: '🔗', title: 'Share with your agent', desc: 'Generate a secure link to share your compliance documents with your letting agent instantly — no login required for them.', action: "Let's go! →", isAdd: false, hint: null },
+    {
+      pose: 'thumbsup',
+      title: 'Add your first property',
+      desc: "Pop in your postcode and I'll find the address for you. Once a property's in, I can start keeping an eye on its dates.",
+      action: 'Add Property →',
+      isAdd: true,
+      hint: null,
+    },
+    {
+      pose: 'certificates',
+      title: 'Upload a compliance document',
+      desc: "Send me your Gas Safety Certificate, EICR, EPC, whatever you've got. I'll read it, work out what it is and when it runs out.",
+      hint: "I'll nudge you at 90, 60, 30, 14 and 7 days before anything expires.",
+      action: 'Got it →',
+      isAdd: false,
+    },
+    {
+      pose: 'wave',
+      title: 'Share with your agent',
+      desc: "Send your agent a secure link and they'll see where you stand straight away. No login needed at their end, and nobody has to chase anybody.",
+      action: "Let's go! →",
+      isAdd: false,
+      hint: null,
+    },
   ];
 
   if (step === 0) {
     return (
       <div style={{ padding: isMobile ? '20px 16px 80px' : '32px', flex: 1 }}>
         <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h1 style={{ color: 'white', fontWeight: '900', fontSize: isMobile ? '22px' : '26px', margin: '0 0 8px' }}>Welcome! Let's get you set up 👋</h1>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', margin: 0 }}>Just two quick questions first</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '12px' : '18px', flexDirection: isMobile ? 'column' : 'row', marginBottom: '32px' }}>
+            <TLMMascot pose="wave" size={isMobile ? 84 : 104} animate="greet" bg="light" />
+            <MateBubble pointer={isMobile ? 'up' : 'left'}>
+              <strong>I'm Mate.</strong> I'll keep track of every certificate and expiry date so you don't have to. Two quick questions and we'll get you set up.
+            </MateBubble>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', marginBottom: '16px' }}>
             <p style={{ color: 'white', fontWeight: '800', fontSize: '17px', margin: '0 0 14px' }}>How many rental properties do you own?</p>
@@ -549,15 +590,19 @@ function OnboardingWizard({ onComplete, onAddProperty, user }) {
           ))}
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(43,124,211,0.3)', borderRadius: '20px', padding: '32px', textAlign: 'center', marginBottom: '16px' }}>
-          {step === 3 ? (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-              <TLMMascot pose="thumbsup" size={100} animate="pop" bg="light" />
-            </div>
-          ) : (
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>{current.icon}</div>
-          )}
-          <h2 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 12px' }}>Step {step}: {current.title}</h2>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', lineHeight: '1.7', margin: '0 0 24px' }}>{current.desc}</p>
+          <h2 style={{ color: 'white', fontWeight: '800', fontSize: '20px', margin: '0 0 20px' }}>Step {step}: {current.title}</h2>
+          {/* Same shape as the step 0 greeting: he stands beside what he says,
+              so the bubble's tail points back at him rather than at the heading. */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '12px' : '16px', flexDirection: isMobile ? 'column' : 'row', marginBottom: '24px' }}>
+            <TLMMascot
+              key={step}
+              pose={current.pose}
+              size={isMobile ? 84 : 96}
+              animate={current.pose === 'wave' ? 'greet' : 'pop'}
+              bg="light"
+            />
+            <MateBubble pointer={isMobile ? 'up' : 'left'} maxWidth={300}>{current.desc}</MateBubble>
+          </div>
           {current.hint && (
             <div style={{ background: 'rgba(43,124,211,0.1)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '10px', padding: '10px 16px', marginBottom: '24px' }}>
               <p style={{ color: '#7db3e8', fontSize: '13px', margin: 0 }}>💡 {current.hint}</p>
@@ -7164,7 +7209,7 @@ function App() {
             <img src={logo} alt="The Landlord Mate" style={{ height: '120px' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-            <TLMMascot pose="wave" size={120} animate="pop" />
+            <TLMMascot pose="wave" size={120} animate="greet" />
           </div>
           <h1 style={{ color: '#0f1e30', marginTop: 0, fontSize: '22px', fontWeight: '800' }}>Check your email</h1>
           <p style={{ color: '#666', fontSize: '15px', lineHeight: '1.6', marginBottom: '24px' }}>We've sent an activation link to <strong>{email}</strong>. Click the link to activate your account.</p>
