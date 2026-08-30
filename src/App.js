@@ -1174,9 +1174,8 @@ function AskAnythingWidget({ properties, forceWales }) {
   return (
     <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px', paddingTop: '8px' }}>
-        <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', margin: '0 0 10px' }}>
-          <TLMMascot pose="head" size={40} animate={loading ? 'bob' : 'none'} bg="light" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', margin: '0 0 10px' }}>
+          <TLMMascot pose="head" size={52} animate={loading ? 'bob' : 'none'} bg="light" />
           <h2 style={{ margin: 0, color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h2>
         </div>
         <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance</p>
@@ -6105,7 +6104,9 @@ function App() {
           <div style={{ marginBottom: '20px' }}>
             <span onClick={() => setScreen('dashboard')} style={{ color: blue, fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-block', marginBottom: '10px' }}>← Back to Dashboard</span>
             <div style={{ textAlign: 'center', paddingTop: '8px' }}>
-              <img src={logo} alt="The Landlord Mate" style={{ height: '90px', marginBottom: '12px' }} />
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                <TLMMascot pose="wave" size={92} animate="greet" bg="light" />
+              </div>
               <h1 style={{ margin: '0 0 10px', color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h1>
               <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance, with memory of your conversation.</p>
             </div>
