@@ -1053,7 +1053,7 @@ function Sidebar({ activeScreen, setScreen, user, handleSignOut, properties, doc
       if (id === 'properties') setSelectedProperty(null);
     }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', cursor: 'pointer', borderLeft: `3px solid ${activeScreen === id ? blue : 'transparent'}`, background: activeScreen === id ? 'rgba(43,124,211,0.1)' : 'transparent', color: activeScreen === id ? 'white' : 'rgba(255,255,255,0.75)', fontSize: '13px', fontWeight: '600', transition: 'all 0.15s' }}>
       {id === 'askmate' ? (
-        <TLMMascot pose="head" size={32} bg="light" />
+        <TLMMascot pose="thumbsup" size={26} bg="light" />
       ) : (
         <span style={{ fontSize: '16px' }}>{icon}</span>
       )}
@@ -1175,7 +1175,7 @@ function AskAnythingWidget({ properties, forceWales }) {
     <div style={{ background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
       <div style={{ textAlign: 'center', marginBottom: '32px', paddingTop: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', margin: '0 0 10px' }}>
-          <TLMMascot pose="head" size={52} animate={loading ? 'bob' : 'none'} bg="light" />
+          <TLMMascot pose="thumbsup" size={46} animate={loading ? 'bob' : 'none'} bg="light" />
           <h2 style={{ margin: 0, color: 'white', fontWeight: '900', fontSize: '36px', fontFamily: font, letterSpacing: '-0.5px' }}>Ask Mate</h2>
         </div>
         <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '15px' }}>Instant answers on landlord law and compliance</p>
@@ -1209,7 +1209,7 @@ function AskAnythingWidget({ properties, forceWales }) {
 
       {loading && (
         <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <TLMMascot pose="head" size={32} animate="bob" bg="light" />
+          <TLMMascot pose="thumbsup" size={28} animate="bob" bg="light" />
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>{loadingMsg}</p>
         </div>
       )}
@@ -1217,7 +1217,7 @@ function AskAnythingWidget({ properties, forceWales }) {
       {answer && !loading && (
         <div style={{ marginTop: '16px', background: 'rgba(43,124,211,0.08)', border: '1px solid rgba(43,124,211,0.25)', borderRadius: '12px', padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px' }}>
-            <TLMMascot pose="head" size={28} bg="light" />
+            <TLMMascot pose="thumbsup" size={24} bg="light" />
             <p style={{ margin: 0, color: blue, fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Answer</p>
           </div>
           <p style={{ margin: 0, color: 'white', fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{answer}</p>
@@ -6127,7 +6127,7 @@ function App() {
             )}
             {aiHistory.map((m, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                {m.role !== 'user' && <TLMMascot pose="head" size={28} bg="light" />}
+                {m.role !== 'user' && <TLMMascot pose="thumbsup" size={24} bg="light" />}
                 <div style={{
                   maxWidth: '75%', padding: '10px 16px', borderRadius: '16px', fontSize: '13px', lineHeight: '1.6', fontFamily: font,
                   background: m.role === 'user' ? blue : 'rgba(255,255,255,0.07)',
@@ -6142,7 +6142,7 @@ function App() {
             ))}
             {aiLoading && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', justifyContent: 'flex-start' }}>
-                <TLMMascot pose="head" size={28} animate="bob" bg="light" />
+                <TLMMascot pose="thumbsup" size={24} animate="bob" bg="light" />
                 <div style={{ padding: '10px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontFamily: font }}>
                   Thinking...
                 </div>
