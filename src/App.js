@@ -1431,6 +1431,7 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
   const [rows, setRows] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [dropNotice, setDropNotice] = useState('');
+  const [saveNotice, setSaveNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const batchIdRef = useRef(crypto.randomUUID());
   const liveProperties = properties.filter(p => !p.deleted_at);
@@ -1608,11 +1609,19 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
     });
     setRows(prev => prev.filter(r => !savedIds.includes(r.id)).map(r => failedIds.includes(r.id) ? { ...r, saveError: errorMessages[r.id] } : r));
     setSaving(false);
-    if (failedIds.length === 0) {
-      await refreshData();
+    // A partial failure used to save the successful rows to the DB and then say
+    // nothing — they vanished from this screen with zero confirmation, and
+    // refreshData() never ran so Properties wouldn't show them until a manual
+    // reload. Now every successful save is acknowledged and reflected immediately,
+    // whether or not the whole batch went through.
+    if (savedIds.length > 0) await refreshData();
+    if (failedIds.length === 0 && savedIds.length > 0) {
       const propCount = new Set(validRows.map(r => r.propertyId)).size;
       setPropertyActionMessage(`✓ ${savedIds.length} document${savedIds.length === 1 ? '' : 's'} added across ${propCount} propert${propCount === 1 ? 'y' : 'ies'}.`);
       setScreen('properties');
+    } else if (savedIds.length > 0) {
+      const propCount = new Set(validRows.filter(r => savedIds.includes(r.id)).map(r => r.propertyId)).size;
+      setSaveNotice(`✓ ${savedIds.length} document${savedIds.length === 1 ? '' : 's'} saved across ${propCount} propert${propCount === 1 ? 'y' : 'ies'} — the ${failedIds.length} below couldn't be saved, check and retry.`);
     }
   };
 
@@ -1725,6 +1734,12 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
           {dropNotice && (
             <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
               <p style={{ margin: 0, color: '#eab308', fontSize: '12px', fontWeight: '600' }}>{dropNotice}</p>
+            </div>
+          )}
+
+          {saveNotice && (
+            <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+              <p style={{ margin: 0, color: '#4ade80', fontSize: '12px', fontWeight: '600' }}>{saveNotice}</p>
             </div>
           )}
 
