@@ -1447,12 +1447,31 @@ function BulkUploadScreen({ user, properties, setScreen, refreshData, setPropert
   const processRow = async (row) => {
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'scanning', error: null } : r));
     try {
-      const fileBase64 = await readFileAsBase64(row.file);
-      const mimeType = row.file.type || 'application/octet-stream';
+      // Claude's vision API only accepts JPEG/PNG/GIF/WebP — HEIC/HEIF (the default
+      // format for iPhone photos) has to be converted client-side first, or every
+      // phone-photographed certificate silently fails the scan.
+      let scanFile = row.file;
+      const ext = (row.fileName.split('.').pop() || '').toLowerCase();
+      const looksHeic = ext === 'heic' || ext === 'heif' || /heic|heif/i.test(row.file.type || '');
+      if (looksHeic) {
+        try {
+          const heic2any = (await import('heic2any')).default;
+          const converted = await heic2any({ blob: row.file, toType: 'image/jpeg', quality: 0.9 });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          const newName = row.fileName.replace(/\.(heic|heif)$/i, '.jpg');
+          scanFile = new File([blob], newName, { type: 'image/jpeg' });
+          setRows(prev => prev.map(r => r.id === row.id ? { ...r, file: scanFile, fileName: newName } : r));
+        } catch (conversionError) {
+          setRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'failed', error: "Couldn't convert this HEIC photo. In Photos, use Share, then Options, and set Format to Most Compatible before re-uploading." } : r));
+          return;
+        }
+      }
+      const fileBase64 = await readFileAsBase64(scanFile);
+      const mimeType = scanFile.type || 'application/octet-stream';
       const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-document-dates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ fileBase64, mimeType, batchId: batchIdRef.current, fileName: row.fileName }),
+        body: JSON.stringify({ fileBase64, mimeType, batchId: batchIdRef.current, fileName: scanFile.name }),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
